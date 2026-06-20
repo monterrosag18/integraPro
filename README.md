@@ -18,12 +18,13 @@ Hoy las células trainee usan Jira + Docusaurus + GitHub por separado. B612 cent
 | Documento | Audiencia | Contenido |
 |---|---|---|
 | [docs/01-prd.md](docs/prd.md) | Dirección Riwi, producto | Problema, visión, MVP, métricas, roadmap, riesgos. |
-| [docs/02-tech-design.md](docs/tech-design.md) | Equipo de desarrollo | Stack, bounded contexts, modelo de dominio, algoritmo de rotación, despliegue AWS. |
+| [docs/02-tech-design.md](docs/tech-design.md) | Equipo de desarrollo | Stack, bounded contexts, modelo de dominio, algoritmo de rotación, despliegue en VPS. |
+| [docs/data-model.md](docs/data-model.md) | Equipo de desarrollo | Diagrama Entidad-Relación: entidades, relaciones e invariantes de la base de datos. |
 
 ## Decisiones validadas
 
 - **MVP scope:** Núcleo Scrum + evaluación. wiki integrada. GitHub solo como link manual.
-- **Stack:** ASP.NET Core 8 + React 18 + PostgreSQL (RDS) + AWS.
+- **Stack:** ASP.NET Core 8 + React 18 + PostgreSQL + VPS (CI/CD con GitHub Actions).
 - **Evaluación:** Bidireccional líder ↔ rotadores + autoevaluación. La profesora de inglés evalúa fuera del sistema.
 - **Rotación:** 8 líderes fijos + 24 rotadores. Sistema sugiere, profesor confirma.
 - **La Rosa:** Profesor decide tras Sprint Review.

@@ -1,0 +1,191 @@
+erDiagram
+    USERS ||--o| CODERS : "is a (1:1)"
+    USERS ||--o{ CLAN_TL : "is TL in"
+    CLANS ||--o{ CLAN_TL : "has TLs"
+
+    CAMPUSES ||--o{ COHORTS : hosts
+    COHORTS  ||--o{ CLANS : groups
+    CLANS    ||--o{ CELLS : contains
+    COHORTS  ||--o{ CODERS : enrolls
+
+    CLANS    ||--o{ SPRINTS : schedules
+    SPRINTS  ||--o{ CELL_ASSIGNMENTS : rotates
+    CELLS    ||--o{ CELL_ASSIGNMENTS : receives
+    CODERS   ||--o{ CELL_ASSIGNMENTS : "assigned to"
+
+    SPRINTS  ||--o{ PROJECTS : contains
+    CELLS    ||--o{ PROJECTS : develops
+    PROJECTS ||--|| BACKLOGS : has
+    PROJECTS ||--|| BOARDS : has
+    BACKLOGS ||--o{ USER_STORIES : contains
+    BOARDS   ||--o{ USER_STORIES : displays
+    CODERS   ||--o{ USER_STORIES : "responsible for"
+
+    PROJECTS ||--o| PLANNINGS : has
+    PROJECTS ||--o| REVIEWS : has
+    PROJECTS ||--o| RETROSPECTIVES : has
+    PROJECTS ||--o{ GITHUB_LINKS : links
+
+    PROJECTS ||--o{ EVALUATIONS : "evaluated in"
+    USERS    ||--o{ EVALUATIONS : evaluator
+    EVALUATIONS ||--o{ EVALUATION_SCORES : details
+    EVALUATION_CRITERIA ||--o{ EVALUATION_SCORES : measures
+
+    SPRINTS ||--o{ ROSES : awards
+    CELLS   ||--o{ ROSES : "wins (1 per sprint)"
+    USERS   ||--o{ ROSES : "grants (TL)"
+    ROSES   ||--o{ CODER_ROSES : "distributed to"
+    CODERS  ||--o{ CODER_ROSES : accumulates
+    CODERS  ||--o{ PRIZE_REDEMPTIONS : makes
+    PRIZES  ||--o{ PRIZE_REDEMPTIONS : "redeemed as (future)"
+
+    USERS {
+        uuid id PK
+        string email
+        string password_hash
+        string full_name
+        string status
+        string role "admin | tl | coder"
+    }
+    CODERS {
+        uuid user_id PK
+        uuid cohort_id FK
+    }
+    CLAN_TL {
+        uuid id PK
+        uuid clan_id FK
+        uuid user_id FK
+        string tl_type "technical | english | life_skills"
+    }
+    CAMPUSES {
+        uuid id PK
+        string name "Medellin | Barranquilla"
+    }
+    COHORTS {
+        uuid id PK
+        uuid campus_id FK
+        string name
+    }
+    CLANS {
+        uuid id PK
+        uuid cohort_id FK
+        string name
+    }
+    CELLS {
+        uuid id PK
+        uuid clan_id FK
+        string name
+    }
+    SPRINTS {
+        uuid id PK
+        uuid clan_id FK
+        int number
+        date start_date
+        date end_date
+        string status
+    }
+    CELL_ASSIGNMENTS {
+        uuid id PK
+        uuid sprint_id FK
+        uuid cell_id FK
+        uuid coder_id FK
+        string role_in_cell "leader | rotator"
+        string status "suggested | confirmed"
+    }
+    PROJECTS {
+        uuid id PK
+        uuid sprint_id FK
+        uuid cell_id FK
+        string name
+    }
+    BACKLOGS {
+        uuid id PK
+        uuid project_id FK
+    }
+    BOARDS {
+        uuid id PK
+        uuid project_id FK
+    }
+    USER_STORIES {
+        uuid id PK
+        uuid backlog_id FK
+        uuid board_id FK
+        string as_a
+        string i_want
+        string so_that
+        string kanban_status "todo|in_progress|review|done"
+        uuid assignee_coder_id FK
+        int estimate "optional"
+        int priority "optional"
+    }
+    PLANNINGS {
+        uuid id PK
+        uuid project_id FK
+        timestamp date
+        string status
+    }
+    REVIEWS {
+        uuid id PK
+        uuid project_id FK
+        timestamp date
+        string status
+    }
+    RETROSPECTIVES {
+        uuid id PK
+        uuid project_id FK
+        timestamp date
+        string status
+    }
+    GITHUB_LINKS {
+        uuid id PK
+        uuid project_id FK
+        string url
+        uuid added_by_user_id FK
+    }
+    EVALUATION_CRITERIA {
+        int id PK
+        string name
+        string scope "project | person"
+        bool active
+    }
+    EVALUATIONS {
+        uuid id PK
+        uuid project_id FK
+        string ceremony_type "review | retrospective"
+        uuid evaluator_user_id FK
+        string subject_type "project | coder"
+        uuid subject_id "polymorphic: project or coder"
+        decimal weight "review; nullable"
+        string eval_type "peer | self; retro; nullable"
+    }
+    EVALUATION_SCORES {
+        uuid id PK
+        uuid evaluation_id FK
+        int criterion_id FK
+        int score "0-5"
+        string comment
+    }
+    ROSES {
+        uuid id PK
+        uuid sprint_id FK
+        uuid cell_id FK
+        uuid granted_by_user_id FK
+    }
+    CODER_ROSES {
+        uuid id PK
+        uuid coder_id FK
+        uuid rose_id FK
+    }
+    PRIZES {
+        uuid id PK
+        string name
+        int cost_in_roses
+        bool active
+    }
+    PRIZE_REDEMPTIONS {
+        uuid id PK
+        uuid coder_id FK
+        uuid prize_id FK
+        int roses_spent
+        timestamp date
+    }
