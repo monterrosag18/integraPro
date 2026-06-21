@@ -1,37 +1,189 @@
-# B612
+# B612 · Scrum Universe
 
-Plataforma Scrum + Gamificación para células de desarrollo trainee de Riwi.
+Plataforma Scrum y de gamificación para células de desarrollo trainee. Integra organización académica, rotaciones, proyectos, Kanban, ceremonias, documentación, evaluaciones, rankings y perfiles de empleabilidad.
 
-> **Working title:** B612 (asteroide de *El Principito*).
-> Cambiar antes de empezar a implementar si Riwi decide otro nombre.
+## Tecnologías
 
-## Estado actual
+- Frontend: React 18, TypeScript y Vite.
+- Backend: ASP.NET Core 8, Entity Framework Core y Swagger.
+- Base de datos: PostgreSQL 16 mediante Docker Compose.
+- Pruebas: xUnit.
 
-Estrategia y documentación de diseño. **No hay código aún.**
+## Requisitos
 
-## Contexto en una frase
+Instala antes de comenzar:
 
-Hoy las células trainee usan Jira + Docusaurus + GitHub por separado. B612 centraliza el flujo Scrum, automatiza la rotación de 24 desarrolladores entre 8 células cada sprint, evalúa desempeño en 3 dimensiones (técnica, humana, inglés) y gamifica con **La Rosa** como insignia al equipo ganador.
+- [Git](https://git-scm.com/downloads)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop/) en Windows, o Docker Engine + Compose en Linux.
+- [.NET SDK 8](https://dotnet.microsoft.com/download/dotnet/8.0)
+- [Node.js 22 LTS](https://nodejs.org/) y npm.
 
-## Documentos
+Comprueba las instalaciones:
 
-| Documento | Audiencia | Contenido |
-|---|---|---|
-| [docs/01-prd.md](docs/prd.md) | Dirección Riwi, producto | Problema, visión, MVP, métricas, roadmap, riesgos. |
-| [docs/02-tech-design.md](docs/tech-design.md) | Equipo de desarrollo | Stack, bounded contexts, modelo de dominio, algoritmo de rotación, despliegue en VPS. |
-| [docs/data-model.md](docs/data-model.md) | Equipo de desarrollo | Diagrama Entidad-Relación: entidades, relaciones e invariantes de la base de datos. |
+```bash
+git --version
+docker --version
+docker compose version
+dotnet --version
+node --version
+npm --version
+```
 
-## Decisiones validadas
+## Instalación en Windows
 
-- **MVP scope:** Núcleo Scrum + evaluación. wiki integrada. GitHub solo como link manual.
-- **Stack:** ASP.NET Core 8 + React 18 + PostgreSQL + VPS (CI/CD con GitHub Actions).
-- **Evaluación:** Bidireccional líder ↔ rotadores + autoevaluación. La profesora de inglés evalúa fuera del sistema.
-- **Rotación:** 8 líderes fijos + 24 rotadores. Sistema sugiere, profesor confirma.
-- **La Rosa:** Profesor decide tras Sprint Review.
+Abre PowerShell:
 
-## Próximos pasos
+```powershell
+git clone https://github.com/monterrosag18/integraPro.git
+Set-Location integraPro
+Copy-Item .env.example .env
+docker compose up -d postgres
+dotnet tool restore
+dotnet restore backend/B612.sln
+```
 
-1. Validar el documento funcional con un TL real de Riwi.
-2. Decidir nombre definitivo del producto.
-4. Prototipar el algoritmo de rotación en aislado durante semana 1 (riesgo #1).
-5. Romper el MVP en historias de usuario con estimación.
+En una primera terminal ejecuta la API:
+
+```powershell
+dotnet run --project backend/src/B612.Api
+```
+
+En una segunda terminal ejecuta el frontend:
+
+```powershell
+Set-Location frontend
+npm install
+npm run dev
+```
+
+## Instalación en Linux
+
+```bash
+git clone https://github.com/monterrosag18/integraPro.git
+cd integraPro
+cp .env.example .env
+docker compose up -d postgres
+dotnet tool restore
+dotnet restore backend/B612.sln
+```
+
+En una primera terminal ejecuta la API:
+
+```bash
+dotnet run --project backend/src/B612.Api
+```
+
+En una segunda terminal ejecuta el frontend:
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+## Direcciones locales
+
+| Servicio | Dirección |
+|---|---|
+| Landing | http://localhost:5173 |
+| Selección de roles | http://localhost:5173/login |
+| API | http://localhost:5080 |
+| Swagger | http://localhost:5080/swagger |
+| Health check | http://localhost:5080/api/health |
+| PostgreSQL | localhost:5432 |
+
+## Credenciales locales de PostgreSQL
+
+Los valores de desarrollo están en `.env.example`:
+
+```env
+POSTGRES_DB=b612
+POSTGRES_USER=b612
+POSTGRES_PASSWORD=b612_dev
+POSTGRES_PORT=5432
+```
+
+Puedes modificarlos en `.env`. No publiques ese archivo.
+
+## Migraciones
+
+El backend inicializa el esquema al arrancar. Para aplicar migraciones manualmente:
+
+```bash
+dotnet tool restore
+dotnet tool run dotnet-ef database update --project backend/src/B612.Infrastructure --startup-project backend/src/B612.Api
+```
+
+## Comandos útiles
+
+Compilar y comprobar el frontend:
+
+```bash
+cd frontend
+npm run build
+npm run lint
+```
+
+Compilar y probar el backend:
+
+```bash
+dotnet build backend/B612.sln
+dotnet test backend/B612.sln
+```
+
+Consultar PostgreSQL:
+
+```bash
+docker compose ps
+docker compose logs -f postgres
+```
+
+Detener los servicios:
+
+```bash
+docker compose down
+```
+
+Eliminar también los datos locales y comenzar desde cero:
+
+```bash
+docker compose down -v
+```
+
+> `down -v` elimina permanentemente el volumen local de PostgreSQL.
+
+## Estructura
+
+```text
+integraPro/
+├── frontend/                  React, rutas, vistas y componentes
+├── backend/
+│   ├── src/B612.Api/          API HTTP y Swagger
+│   ├── src/B612.Application/  Casos de uso y contratos
+│   ├── src/B612.Domain/       Entidades y reglas de negocio
+│   ├── src/B612.Infrastructure/EF Core y PostgreSQL
+│   └── tests/                 Pruebas automatizadas
+├── docs/                      PRD y modelo entidad–relación
+├── mockups/                   Referencias visuales
+├── .env.example               Configuración local de ejemplo
+└── docker-compose.yml         PostgreSQL local
+```
+
+## Estado del prototipo
+
+- Vistas navegables para Admin, TL, Líder y Coder.
+- Rotación de coders y cambio excepcional de líder.
+- Kanban arrastrable para líder y coder.
+- Documentación Markdown y experiencia de lectura tipo Docusaurus.
+- Evaluaciones semanales de 1 a 5 estrellas.
+- Perfil editable, logros, Rosas y rankings.
+- Datos demostrativos en frontend: algunas interacciones aún se reinician al recargar.
+
+La definición funcional y el modelo de datos se encuentran en [`docs/`](docs/).
+
+## Solución de problemas
+
+- Si Docker no responde en Windows, abre Docker Desktop y espera a que el motor indique que está activo.
+- Si el puerto `5432` está ocupado, cambia `POSTGRES_PORT` en `.env` y actualiza la cadena de conexión del backend.
+- Si Vite rechaza la versión de Node, instala Node.js 22 LTS.
+- Si la API no conecta con PostgreSQL, comprueba `docker compose ps` y espera a que el contenedor aparezca como `healthy`.

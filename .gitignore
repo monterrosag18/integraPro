@@ -1,1 +1,16 @@
 CLAUDE.md
+.env
+.dotnet/
+.dotnet-home/
+.idea/
+.vs/
+.vscode/
+**/bin/
+**/obj/
+**/node_modules/
+frontend/dist/
+*.user
+*.suo
+*.log
+.DS_Store
+Thumbs.db
