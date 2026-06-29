@@ -3,6 +3,7 @@ using B612.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Npgsql;
 
 namespace B612.Infrastructure;
 
@@ -14,6 +15,7 @@ public static class DependencyInjection
             ?? throw new InvalidOperationException("Connection string 'Database' was not configured.");
 
         services.AddDbContext<B612DbContext>(options => options.UseNpgsql(connectionString));
+        services.AddSingleton(_ => NpgsqlDataSource.Create(connectionString));
         services.AddScoped<IApplicationDbContext>(provider => provider.GetRequiredService<B612DbContext>());
         return services;
     }

@@ -1,23 +1,31 @@
 using B612.Infrastructure;
 using B612.Infrastructure.Persistence;
+using B612.Api.BackgroundServices;
 
 var builder = WebApplication.CreateBuilder(args);
+
+builder.Logging.ClearProviders();
+builder.Logging.AddConsole();
 
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddHostedService<SprintAutoCloseService>();
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("Frontend", policy =>
-        policy.WithOrigins("http://localhost:5173")
+        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
             .AllowAnyHeader()
             .AllowAnyMethod());
 });
 
 var app = builder.Build();
 
-await app.Services.InitialiseDatabaseAsync();
+if (builder.Configuration.GetValue("Database:AutoMigrate", true))
+{
+    await app.Services.InitialiseDatabaseAsync();
+}
 
 if (app.Environment.IsDevelopment())
 {

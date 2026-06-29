@@ -1,6 +1,6 @@
 import { ArrowUpRight, Volume2 } from 'lucide-react'
 import { useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 
 const stars = [
   ['12%','18%','1.2s'],['21%','67%','2.7s'],['39%','26%','.3s'],['48%','73%','1.8s'],
@@ -9,9 +9,11 @@ const stars = [
 ]
 
 export function LandingPage() {
+  const navigate = useNavigate()
   const scene = useRef<HTMLElement>(null)
   const audio = useRef<AudioContext | null>(null)
   const [soundOn, setSoundOn] = useState(false)
+  const [entering, setEntering] = useState(false)
   const move = (event: React.MouseEvent<HTMLElement>) => {
     const x = (event.clientX / window.innerWidth - .5) * 2
     const y = (event.clientY / window.innerHeight - .5) * 2
@@ -27,9 +29,14 @@ export function LandingPage() {
     oscillator.connect(gain); gain.connect(context.destination); oscillator.start()
     audio.current = context; setSoundOn(true)
   }
+  const enterUniverse = () => {
+    if (entering) return
+    setEntering(true)
+    window.setTimeout(() => navigate('/login'), 760)
+  }
 
   return (
-    <main className="landing-minimal" ref={scene} onMouseMove={move}>
+    <main className={`landing-minimal ${entering ? 'landing-minimal--entering' : ''}`} ref={scene} onMouseMove={move}>
       <div className="landing-minimal__image" />
       <div className="landing-minimal__vignette" />
       <div className="landing-nebula" />
@@ -41,8 +48,9 @@ export function LandingPage() {
       <div className="rose-aura"><span/><i/><b/></div>
       <div className="scarf-motion scarf-motion--one"/><div className="scarf-motion scarf-motion--two"/>
       <header className="minimal-brand"><span>B</span><div><strong>B612</strong><small>SCRUM UNIVERSE</small></div></header>
-      <nav className="minimal-nav"><Link to="/login">Entrar al universo <ArrowUpRight size={15}/></Link></nav>
-      <section className="minimal-copy"><p>UNA EXPERIENCIA PARA CÉLULAS QUE CRECEN</p><h1>Viaja.<br/><span>Construye.</span><br/>Florece.</h1><Link to="/login">Comenzar viaje <ArrowUpRight size={18}/></Link></section>
+      <nav className="minimal-nav"><button onClick={enterUniverse}>Entrar al universo <ArrowUpRight size={15}/></button></nav>
+      <section className="minimal-copy"><p>UNA EXPERIENCIA PARA CÉLULAS QUE CRECEN</p><h1>Viaja.<br/><span>Construye.</span><br/>Florece.</h1><button onClick={enterUniverse}>Comenzar viaje <ArrowUpRight size={18}/></button></section>
+      <div className="universe-warp" aria-hidden="true"><span /><i /><b /></div>
       <div className="minimal-caption"><span>01</span><p>B612 convierte cada sprint en una historia que vale la pena recordar.</p></div>
       <button className={`sound-control ${soundOn?'sound-control--active':''}`} aria-label={soundOn?'Desactivar ambiente':'Activar ambiente'} onClick={toggleSound}><Volume2 size={16}/></button>
       <div className="scroll-mark"><span/> Mueve el cursor para explorar</div>
