@@ -251,21 +251,25 @@ public sealed class ProjectsController(NpgsqlDataSource dataSource) : Controller
         await using var cmd = dataSource.CreateCommand("""
             update user_stories us
             set i_want = coalesce(@i_want, i_want),
+                as_a = coalesce(@as_a, as_a),
+                so_that = coalesce(@so_that, so_that),
                 estimate = coalesce(@estimate, estimate)
             from backlogs b
             where us.id = @story_id and us.backlog_id = b.id and b.project_id = @project_id
-            returning us.id, us.i_want, us.estimate;
+            returning us.id, us.as_a, us.i_want, us.so_that, us.estimate;
             """);
         cmd.Parameters.AddWithValue("story_id", storyId);
         cmd.Parameters.AddWithValue("project_id", projectId);
         cmd.Parameters.AddWithValue("i_want", (object?)request.IWant ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("as_a", (object?)request.AsA ?? DBNull.Value);
+        cmd.Parameters.AddWithValue("so_that", (object?)request.SoThat ?? DBNull.Value);
         cmd.Parameters.AddWithValue("estimate", (object?)request.Estimate ?? DBNull.Value);
         await using var reader = await cmd.ExecuteReaderAsync(cancellationToken);
         if (!await reader.ReadAsync(cancellationToken)) return NotFound(new { message = "Story not found." });
-        return Ok(new { id = reader.GetGuid(0), iWant = reader.GetString(1), estimate = reader.GetInt32(2) });
+        return Ok(new { id = reader.GetGuid(0), asA = reader.GetString(1), iWant = reader.GetString(2), soThat = reader.GetString(3), estimate = reader.GetInt32(4) });
     }
 }
 
 public sealed record UpdateStoryStatusRequest(string Status);
 public sealed record CreateStoryRequest(string IWant, string? AsA, string? SoThat, int? Estimate, int? Priority);
-public sealed record UpdateStoryRequest(string? IWant, int? Estimate);
+public sealed record UpdateStoryRequest(string? IWant, string? AsA, string? SoThat, int? Estimate);

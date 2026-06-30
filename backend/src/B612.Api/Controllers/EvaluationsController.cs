@@ -104,6 +104,51 @@ public sealed class EvaluationsController(NpgsqlDataSource dataSource) : Control
 
         return Ok(new { anonymous = true, criteria = rows });
     }
+
+    [HttpGet("coders")]
+    public async Task<IActionResult> CoderScores(
+        [FromQuery] Guid? projectId,
+        [FromQuery] string? clanName,
+        CancellationToken cancellationToken)
+    {
+        await using var command = dataSource.CreateCommand("""
+            select
+                u.id as coder_id,
+                concat_ws(' ', u.first_name, u.last_name) as coder_name,
+                count(distinct es.id) as total_scores,
+                round(avg(es.score)::numeric, 2) as overall_avg,
+                count(distinct ev.evaluator_user_id) as evaluator_count
+            from evaluations ev
+            join users u on u.id = ev.user_id
+            join evaluation_scores es on es.evaluation_id = ev.id
+            left join projects p on p.id = ev.project_id
+            left join cells ce on ce.id = p.cell_id
+            left join clans cl on cl.id = ce.clan_id
+            where ev.user_id is not null
+              and (@project_id::uuid is null or ev.project_id = @project_id)
+              and (@clan_name::text is null or cl.name = @clan_name)
+            group by u.id, u.first_name, u.last_name
+            order by overall_avg desc;
+            """);
+        command.Parameters.AddWithValue("project_id", (object?)projectId ?? DBNull.Value);
+        command.Parameters.AddWithValue("clan_name", (object?)clanName ?? DBNull.Value);
+
+        var rows = new List<object>();
+        await using var reader = await command.ExecuteReaderAsync(cancellationToken);
+        while (await reader.ReadAsync(cancellationToken))
+        {
+            rows.Add(new
+            {
+                coderId = reader.GetGuid(0),
+                coderName = reader.GetString(1),
+                totalScores = reader.GetInt64(2),
+                overallAvg = reader.GetDecimal(3),
+                evaluatorCount = reader.GetInt64(4)
+            });
+        }
+
+        return Ok(new { coders = rows });
+    }
 }
 
 public sealed record CreateEvaluationRequest(

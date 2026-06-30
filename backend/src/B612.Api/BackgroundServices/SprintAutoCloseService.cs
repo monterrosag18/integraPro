@@ -39,12 +39,11 @@ public sealed class SprintAutoCloseService(NpgsqlDataSource dataSource, ILogger<
     {
         await using var command = dataSource.CreateCommand("""
             update sprints
-            set status = 'closed',
-                closed_at = coalesce(closed_at, now()),
-                closed_by = 'system'
-            where lower(status) = 'active'
-              and end_date < current_date
-            returning id, number;
+            set "Status" = 'closed',
+                "UpdatedAt" = now()
+            where lower("Status") = 'active'
+              and "EndDate" < current_date
+            returning "Id", "Number";
             """);
 
         var closed = 0;
