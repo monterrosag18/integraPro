@@ -1,6 +1,7 @@
 using B612.Infrastructure;
 using B612.Infrastructure.Persistence;
 using B612.Api.BackgroundServices;
+using B612.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,7 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 builder.Services.AddHttpClient();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddSingleton<S3TalentPassportService>();
 builder.Services.AddHostedService<SprintAutoCloseService>();
 builder.Services.AddCors(options =>
 {

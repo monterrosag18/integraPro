@@ -1,11 +1,16 @@
 using Microsoft.AspNetCore.Mvc;
 using Npgsql;
+using B612.Api.Services;
 
 namespace B612.Api.Controllers;
 
 [ApiController]
 [Route("api/dashboard")]
-public sealed class DashboardController(NpgsqlDataSource dataSource, IConfiguration configuration) : ControllerBase
+public sealed class DashboardController(
+    NpgsqlDataSource dataSource,
+    IConfiguration configuration,
+    S3TalentPassportService s3,
+    ILogger<DashboardController> logger) : ControllerBase
 {
     [HttpGet("summary")]
     public async Task<IActionResult> Summary(CancellationToken cancellationToken)
@@ -364,6 +369,63 @@ public sealed class DashboardController(NpgsqlDataSource dataSource, IConfigurat
     [HttpGet("talent-passport")]
     public async Task<IActionResult> TalentPassport(CancellationToken cancellationToken)
     {
+        // S3 preferred: use pre-computed Glue KPIs when the bucket is configured
+        if (s3.IsConfigured)
+        {
+            try
+            {
+                var result = await s3.ReadLatestAsync(cancellationToken);
+                if (result.Coders.Count > 0)
+                {
+                    var s3Coders = result.Coders
+                        .OrderByDescending(c => c.employment_score)
+                        .Select((c, i) => (object)new
+                        {
+                            rank        = (long)(i + 1),
+                            id          = Guid.TryParse(c.coder_id, out var gid) ? gid : Guid.Empty,
+                            name        = $"{c.first_name} {c.last_name}".Trim(),
+                            email       = c.email ?? "",
+                            cell        = c.campus_name ?? "",
+                            clan        = c.cohort_name ?? "",
+                            score       = Math.Round(c.employment_score, 1),
+                            tier        = c.employability_level ?? "—",
+                            dims        = new
+                            {
+                                technical     = Math.Round(c.d_technical,    1),
+                                delivery      = Math.Round(c.d_delivery,     1),
+                                collaboration = Math.Round(c.d_collab,       1),
+                                professional  = Math.Round(c.d_professional, 1),
+                                achievements  = Math.Round(c.d_achievement,  1),
+                                continuous    = Math.Round(c.d_ci,           1),
+                            },
+                            metrics = new
+                            {
+                                stories = 0L, doneStories = 0L,
+                                totalPoints = 0m, donePoints = 0m,
+                                evaluations = 0L, evaluationScores = 0L, averageEvaluation = 0m,
+                                roses = 0L, redemptions = 0L,
+                                assignments = 0L, sprints = 0L,
+                                cellsWorked = 0L, leaderRuns = 0L,
+                                dataCoverage = 100m,
+                            }
+                        })
+                        .ToList();
+
+                    return Ok(new
+                    {
+                        coders   = s3Coders,
+                        cells    = Array.Empty<object>(),
+                        source   = "s3",
+                        execDate = result.ExecDate,
+                    });
+                }
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "[S3] Read failed — falling back to PostgreSQL");
+            }
+        }
+
         var coders = new List<object>();
         var cells = new List<object>();
         await using var readDataSource = CreateReadDataSource();
@@ -667,7 +729,7 @@ public sealed class DashboardController(NpgsqlDataSource dataSource, IConfigurat
             }
         }
 
-        return Ok(new { coders, cells });
+        return Ok(new { coders, cells, source = "postgresql", execDate = (string?)null });
     }
 
     private NpgsqlDataSource? CreateReadDataSource()

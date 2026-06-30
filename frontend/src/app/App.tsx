@@ -4,13 +4,13 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRouter } from './router/AppRouter'
 import { installEnglishUi } from '../shared/i18n/englishUi'
 
+installEnglishUi()
+
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 30_000, retry: 1 } },
 })
 
 export function App() {
-  installEnglishUi()
-
   return (
     <AppProviders>
       <AppRouter />

@@ -1,5 +1,6 @@
 import { ArrowUpRight, BarChart3, BookOpen, BrainCircuit, Database, Download, Flame, Gauge, GitBranch, Medal, Search, ShieldAlert, Sparkles, Trophy, Users, X } from 'lucide-react'
-import { type ElementType, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiRequest } from '../../shared/api/httpClient'
 import { getCurrentUser } from '../../shared/auth/session'
 import { RoleShell } from '../../shared/components/layout/RoleShell'
@@ -26,51 +27,51 @@ type TalentMetrics = {
 }
 type TalentCoder = { rank: number; id?: string; name: string; email?: string; cell: string; clan?: string; score: number; tier: TalentTier; dims: Record<DimensionKey, number>; metrics?: TalentMetrics }
 type CellRank = { cell: string; clan?: string; avg: number; count: number; roses?: number; accent: string; mural: string }
-type TalentResponse = { coders: TalentCoder[]; cells: Array<{ cell: string; clan: string; avg: number; count: number; roses?: number }> }
+type TalentResponse = { coders: TalentCoder[]; cells: Array<{ cell: string; clan: string; avg: number; count: number; roses?: number }>; source?: string; execDate?: string | null }
 
 const murals = ['/images/mural/riwi-mural-planet.jpg', '/images/mural/riwi-mural-fox.jpg', '/images/mural/riwi-mural-cup.jpg', '/images/mural/riwi-mural-rocket.jpg', '/images/mural/riwi-mural-rose.jpg', '/images/mural/riwi-mural-meteor.jpg']
 const accents = ['#f3c43d', '#e86f2d', '#8fd7a8', '#f0783f', '#5cc7d8', '#b99cff']
 
 const dimensionDefs: Array<{ key: DimensionKey; apiKey: string; label: string; short: string; color: string; weight: number }> = [
-  { key: 'technical', apiKey: 'dim_technical', label: 'Excelencia Tecnica', short: 'Tecnica', color: '#5cc7d8', weight: 30 },
-  { key: 'delivery', apiKey: 'dim_delivery', label: 'Desempeno en Entrega', short: 'Entrega', color: '#f3c43d', weight: 20 },
-  { key: 'collaboration', apiKey: 'dim_collaboration', label: 'Colaboracion de Equipo', short: 'Colab.', color: '#8fd7a8', weight: 15 },
-  { key: 'professional', apiKey: 'dim_professional', label: 'Comportamiento Profesional', short: 'Profesional', color: '#f0783f', weight: 10 },
-  { key: 'achievements', apiKey: 'dim_achievements', label: 'Logros y Reconocimientos', short: 'Logros', color: '#ff9f43', weight: 10 },
-  { key: 'continuous', apiKey: 'dim_continuous', label: 'Mejora Continua', short: 'Mejora', color: '#b8d99a', weight: 15 },
+  { key: 'technical', apiKey: 'dim_technical', label: 'Technical Excellence', short: 'Technical', color: '#5cc7d8', weight: 30 },
+  { key: 'delivery', apiKey: 'dim_delivery', label: 'Delivery Performance', short: 'Delivery', color: '#f3c43d', weight: 20 },
+  { key: 'collaboration', apiKey: 'dim_collaboration', label: 'Team Collaboration', short: 'Collab.', color: '#8fd7a8', weight: 15 },
+  { key: 'professional', apiKey: 'dim_professional', label: 'Professional Behavior', short: 'Professional', color: '#f0783f', weight: 10 },
+  { key: 'achievements', apiKey: 'dim_achievements', label: 'Achievements & Recognition', short: 'Achievements', color: '#ff9f43', weight: 10 },
+  { key: 'continuous', apiKey: 'dim_continuous', label: 'Continuous Improvement', short: 'Improvement', color: '#b8d99a', weight: 15 },
 ]
 
 const kpiCatalog: Array<{ id: string; name: string; dimension: DimensionKey; formula: string; source: string; status: KpiStatus }> = [
-  { id: 'KPI-001', name: 'Technical Score', dimension: 'technical', formula: 'Promedio ponderado de evaluaciones tecnicas', source: 'evaluations + evaluation_scores', status: 'ready' },
-  { id: 'KPI-002', name: 'Competency Score', dimension: 'technical', formula: 'Promedio por competencia', source: 'evaluation_criteria', status: 'partial' },
-  { id: 'KPI-003', name: 'Evaluation Consistency', dimension: 'technical', formula: 'Desviacion estandar del desempeno tecnico', source: 'evaluation_scores', status: 'partial' },
-  { id: 'KPI-004', name: 'Technical Strength Index', dimension: 'technical', formula: 'Competencias con score >= 85', source: 'evaluation_scores', status: 'partial' },
-  { id: 'KPI-005', name: 'Technical Weakness Index', dimension: 'technical', formula: 'Competencias con score < 70', source: 'evaluation_scores', status: 'partial' },
-  { id: 'KPI-006', name: 'Throughput', dimension: 'delivery', formula: 'Historias completadas por sprint', source: 'user_stories', status: 'ready' },
-  { id: 'KPI-007', name: 'Sprint Completion Rate', dimension: 'delivery', formula: 'Historias done / historias planificadas', source: 'user_stories + sprints', status: 'ready' },
-  { id: 'KPI-008', name: 'Lead Time', dimension: 'delivery', formula: 'Creacion hasta done', source: 'user_stories timestamps', status: 'gap' },
-  { id: 'KPI-009', name: 'Cycle Time', dimension: 'delivery', formula: 'In progress hasta done', source: 'user_stories timestamps', status: 'gap' },
+  { id: 'KPI-001', name: 'Technical Score', dimension: 'technical', formula: 'Weighted average of technical evaluations', source: 'evaluations + evaluation_scores', status: 'ready' },
+  { id: 'KPI-002', name: 'Competency Score', dimension: 'technical', formula: 'Average per competency', source: 'evaluation_criteria', status: 'partial' },
+  { id: 'KPI-003', name: 'Evaluation Consistency', dimension: 'technical', formula: 'Standard deviation of technical performance', source: 'evaluation_scores', status: 'partial' },
+  { id: 'KPI-004', name: 'Technical Strength Index', dimension: 'technical', formula: 'Competencies with score >= 85', source: 'evaluation_scores', status: 'partial' },
+  { id: 'KPI-005', name: 'Technical Weakness Index', dimension: 'technical', formula: 'Competencies with score < 70', source: 'evaluation_scores', status: 'partial' },
+  { id: 'KPI-006', name: 'Throughput', dimension: 'delivery', formula: 'Stories completed per sprint', source: 'user_stories', status: 'ready' },
+  { id: 'KPI-007', name: 'Sprint Completion Rate', dimension: 'delivery', formula: 'Done stories / planned stories', source: 'user_stories + sprints', status: 'ready' },
+  { id: 'KPI-008', name: 'Lead Time', dimension: 'delivery', formula: 'Creation to done', source: 'user_stories timestamps', status: 'gap' },
+  { id: 'KPI-009', name: 'Cycle Time', dimension: 'delivery', formula: 'In progress to done', source: 'user_stories timestamps', status: 'gap' },
   { id: 'KPI-010', name: 'Productivity Index', dimension: 'delivery', formula: 'Throughput + lead time + completion rate', source: 'user_stories', status: 'partial' },
-  { id: 'KPI-011', name: 'Collaboration Score', dimension: 'collaboration', formula: 'Promedio de peer reviews', source: 'evaluations peer', status: 'partial' },
-  { id: 'KPI-012', name: 'Team Diversity Index', dimension: 'collaboration', formula: 'Equipos distintos donde participo', source: 'cell_assignments', status: 'ready' },
-  { id: 'KPI-013', name: 'Participation Index', dimension: 'collaboration', formula: 'Ceremonias o actividades registradas', source: 'ceremonies + assignments', status: 'partial' },
-  { id: 'KPI-014', name: 'Peer Recognition', dimension: 'collaboration', formula: 'Reconocimientos otorgados por companeros', source: 'roses + coder_roses', status: 'ready' },
-  { id: 'KPI-015', name: 'Performance Stability', dimension: 'professional', formula: 'Estabilidad del rendimiento entre evaluaciones', source: 'evaluation_scores', status: 'partial' },
-  { id: 'KPI-016', name: 'Participation Continuity', dimension: 'professional', formula: 'Sprints con participacion continua', source: 'cell_assignments + sprints', status: 'ready' },
-  { id: 'KPI-017', name: 'Commitment Score', dimension: 'professional', formula: 'Asistencia + cumplimiento + participacion', source: 'attendance + commitments', status: 'gap' },
-  { id: 'KPI-018', name: 'Achievement Count', dimension: 'achievements', formula: 'Cantidad de premios o logros', source: 'prizes + redemptions', status: 'partial' },
-  { id: 'KPI-019', name: 'Badge Score', dimension: 'achievements', formula: 'Cantidad de insignias', source: 'badges', status: 'gap' },
-  { id: 'KPI-020', name: 'Recognition Index', dimension: 'achievements', formula: 'Premios + insignias + reconocimientos', source: 'roses + badges + medals', status: 'partial' },
-  { id: 'KPI-021', name: 'Technical Growth Rate', dimension: 'continuous', formula: 'Variacion tecnica entre primer y ultimo periodo', source: 'historico de evaluaciones', status: 'partial' },
-  { id: 'KPI-022', name: 'Productivity Growth Rate', dimension: 'continuous', formula: 'Variacion de productividad entre periodos', source: 'historico de stories', status: 'partial' },
-  { id: 'KPI-023', name: 'Trend Score', dimension: 'continuous', formula: 'Pendiente por regresion lineal', source: '>= 3 periodos historicos', status: 'gap' },
-  { id: 'KPI-024', name: 'Continuous Improvement Score', dimension: 'continuous', formula: 'Crecimiento tecnico + productividad + estabilidad + tendencia', source: 'kpis historicos', status: 'partial' },
+  { id: 'KPI-011', name: 'Collaboration Score', dimension: 'collaboration', formula: 'Average of peer reviews', source: 'evaluations peer', status: 'partial' },
+  { id: 'KPI-012', name: 'Team Diversity Index', dimension: 'collaboration', formula: 'Distinct teams participated in', source: 'cell_assignments', status: 'ready' },
+  { id: 'KPI-013', name: 'Participation Index', dimension: 'collaboration', formula: 'Registered ceremonies or activities', source: 'ceremonies + assignments', status: 'partial' },
+  { id: 'KPI-014', name: 'Peer Recognition', dimension: 'collaboration', formula: 'Recognition given by teammates', source: 'roses + coder_roses', status: 'ready' },
+  { id: 'KPI-015', name: 'Performance Stability', dimension: 'professional', formula: 'Performance stability across evaluations', source: 'evaluation_scores', status: 'partial' },
+  { id: 'KPI-016', name: 'Participation Continuity', dimension: 'professional', formula: 'Sprints with continuous participation', source: 'cell_assignments + sprints', status: 'ready' },
+  { id: 'KPI-017', name: 'Commitment Score', dimension: 'professional', formula: 'Attendance + compliance + participation', source: 'attendance + commitments', status: 'gap' },
+  { id: 'KPI-018', name: 'Achievement Count', dimension: 'achievements', formula: 'Number of prizes or achievements', source: 'prizes + redemptions', status: 'partial' },
+  { id: 'KPI-019', name: 'Badge Score', dimension: 'achievements', formula: 'Number of badges', source: 'badges', status: 'gap' },
+  { id: 'KPI-020', name: 'Recognition Index', dimension: 'achievements', formula: 'Prizes + badges + recognitions', source: 'roses + badges + medals', status: 'partial' },
+  { id: 'KPI-021', name: 'Technical Growth Rate', dimension: 'continuous', formula: 'Technical variation between first and last period', source: 'evaluation history', status: 'partial' },
+  { id: 'KPI-022', name: 'Productivity Growth Rate', dimension: 'continuous', formula: 'Productivity variation between periods', source: 'story history', status: 'partial' },
+  { id: 'KPI-023', name: 'Trend Score', dimension: 'continuous', formula: 'Slope via linear regression', source: '>= 3 historical periods', status: 'gap' },
+  { id: 'KPI-024', name: 'Continuous Improvement Score', dimension: 'continuous', formula: 'Technical growth + productivity + stability + trend', source: 'historical KPIs', status: 'partial' },
 ]
 
 const gaps = [
-  ['KPI-008', 'Lead Time', 'Desempeno en Entrega', 'user_stories no tiene timestamps de cambio de estado. Se necesita created_at, started_at y done_at por historia.'],
-  ['KPI-009', 'Cycle Time', 'Desempeno en Entrega', 'Igual que Lead Time: requiere timestamps de inicio y fin de desarrollo.'],
-  ['KPI-023', 'Trend Score', 'Mejora Continua', 'Requiere al menos 3 periodos historicos de datos. Se activa cuando haya varias ejecuciones del pipeline.'],
+  ['KPI-008', 'Lead Time', 'Delivery Performance', 'user_stories has no state-change timestamps. Needs created_at, started_at and done_at per story.'],
+  ['KPI-009', 'Cycle Time', 'Delivery Performance', 'Same as Lead Time: requires start and end timestamps for development.'],
+  ['KPI-023', 'Trend Score', 'Continuous Improvement', 'Requires at least 3 historical data periods. Activates once multiple pipeline runs exist.'],
 ]
 
 function tierFromScore(score: number): TalentTier {
@@ -117,25 +118,26 @@ function scoreColor(score: number) {
 
 export function TalentPassportPage() {
   const sessionUser = getCurrentUser()
-  const [view, setView] = useState<ViewKey>('general')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const view = (searchParams.get('view') as ViewKey) ?? 'general'
   const [query, setQuery] = useState('')
-  const [selectedCell, setSelectedCell] = useState('Todas')
+  const [selectedCell, setSelectedCell] = useState('All')
   const [minScore, setMinScore] = useState(0)
   const [selectedCoderId, setSelectedCoderId] = useState('')
   const [compareA, setCompareA] = useState('')
   const [compareB, setCompareB] = useState('')
   const [cellView, setCellView] = useState('')
-  const [remote, setRemote] = useState<{ coders: TalentCoder[]; cells: CellRank[] } | null>(null)
+  const [remote, setRemote] = useState<{ coders: TalentCoder[]; cells: CellRank[]; source?: string; execDate?: string | null } | null>(null)
   const [loadError, setLoadError] = useState('')
 
   useEffect(() => {
     void apiRequest<TalentResponse>('/dashboard/talent-passport').then(data => {
       const coders = normalizeCoders(data.coders)
       const cells = data.cells.map((cell, index) => ({ ...cell, avg: Number(cell.avg), accent: accents[index % accents.length], mural: murals[index % murals.length] }))
-      setRemote({ coders, cells })
+      setRemote({ coders, cells, source: data.source, execDate: data.execDate })
       setLoadError('')
     }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : 'No se pudo conectar con el API real.'
+      const message = error instanceof Error ? error.message : 'Could not connect to the real API.'
       console.error('[TalentPassport] API real no disponible:', error)
       setLoadError(message)
       setRemote(null)
@@ -143,7 +145,9 @@ export function TalentPassportPage() {
   }, [])
 
   const coders = useMemo(() => normalizeCoders(remote?.coders ?? []), [remote])
-  const sourceNote = remote ? 'PostgreSQL real' : 'Esperando API real'
+  const sourceNote = remote
+    ? (remote.source === 's3' ? `AWS S3${remote.execDate ? ` · ${remote.execDate}` : ''}` : 'Real PostgreSQL')
+    : 'Waiting for real API'
 
   const derivedCells = useMemo(() => {
     const groups = new Map<string, TalentCoder[]>()
@@ -169,7 +173,7 @@ export function TalentPassportPage() {
   }, [cellsForFilters, coders])
 
   const filtered = useMemo(() => coders
-    .filter(coder => selectedCell === 'Todas' || coder.cell === selectedCell)
+    .filter(coder => selectedCell === 'All' || coder.cell === selectedCell)
     .filter(coder => coder.score >= minScore)
     .filter(coder => `${coder.name} ${coder.email ?? ''} ${coder.cell}`.toLowerCase().includes(query.toLowerCase()))
     .sort((a, b) => b.score - a.score || a.rank - b.rank), [coders, minScore, query, selectedCell])
@@ -210,45 +214,31 @@ export function TalentPassportPage() {
   }, [coders])
   const maxDist = Math.max(...distribution.map(bin => bin.count), 1)
 
-  const tabs: Array<[ViewKey, ElementType, string]> = [
-    ['general', BarChart3, 'General'],
-    ['comparador', Gauge, 'Comparar'],
-    ['student', Users, 'Coder'],
-    ['celula', Medal, 'Celula'],
-    ['heatmap', Flame, 'Heatmap'],
-    ['kpis', BookOpen, 'KPIs'],
-    ['insights', BrainCircuit, 'Insights'],
-  ]
-
   return (
     <RoleShell role="Admin" name={sessionUser?.fullName ?? 'Admin B612'}>
       <section className="talent-passport talent-dashboard-v2">
         <header className="talent-hero dashboard-hero-v2">
           <div className="talent-hero__copy">
             <p className="eyebrow">B612 Talent Passport Analytics</p>
-            <h1>Dashboard de <span>Empleabilidad</span></h1>
-            <p>Integramos la capa analitica de la carpeta B-612: 24 KPIs, 6 dimensiones, scoring ponderado, tiers, gaps, trazabilidad e insights para direccion academica.</p>
+            <h1>Employability <span>Dashboard</span></h1>
+            <p>We integrate the B-612 analytics layer: 24 KPIs, 6 dimensions, weighted scoring, tiers, gaps, traceability, and insights for academic direction.</p>
             <div className="talent-actions">
               <span><Database /> {sourceNote}</span>
-              <a href="https://github.com/Riwi-io-Medellin/212-b-612/tree/dev" target="_blank" rel="noreferrer"><GitBranch /> Rama dev <ArrowUpRight /></a>
-              <button type="button" onClick={() => window.print()}><Download /> Exportar</button>
+              <a href="https://github.com/Riwi-io-Medellin/212-b-612/tree/dev" target="_blank" rel="noreferrer"><GitBranch /> dev branch <ArrowUpRight /></a>
+              <button type="button" onClick={() => window.print()}><Download /> Export</button>
             </div>
-            {loadError && <p className="dashboard-error">API real no disponible: {loadError}</p>}
-            {!loadError && remote && coders.length === 0 && <p className="dashboard-error">La API real respondio, pero no hay coders registrados para analizar.</p>}
+            {loadError && <p className="dashboard-error">Real API unavailable: {loadError}</p>}
+            {!loadError && remote && coders.length === 0 && <p className="dashboard-error">The real API responded, but there are no coders registered to analyze.</p>}
           </div>
           <div className="dashboard-side-panel">
-            <label><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Buscar estudiante o celula..." /></label>
+            <label><Search size={15} /><input value={query} onChange={event => setQuery(event.target.value)} placeholder="Search student or cell..." /></label>
             <select value={selectedCell} onChange={event => setSelectedCell(event.target.value)}>
-              <option>Todas</option>
+              <option>All</option>
               {cellsForFilters.map(cell => <option key={cell}>{cell}</option>)}
             </select>
-            <div className="score-filter"><span>Score minimo: <b>{minScore}</b></span><input type="range" min={0} max={100} step={5} value={minScore} onChange={event => setMinScore(Number(event.target.value))} /></div>
+            <div className="score-filter"><span>Min score: <b>{minScore}</b></span><input type="range" min={0} max={100} step={5} value={minScore} onChange={event => setMinScore(Number(event.target.value))} /></div>
           </div>
         </header>
-
-        <nav className="dashboard-tabs dashboard-tabs--wide">
-          {tabs.map(([key, Icon, label]) => <button className={view === key ? 'active' : ''} key={key} onClick={() => setView(key)}><Icon />{label}</button>)}
-        </nav>
 
         {coders.length === 0 && <section className="passport-panel">
           <div className="passport-title"><div><p className="eyebrow">Datos reales</p><h2>Sin registros para analizar</h2></div><Database /></div>
@@ -257,18 +247,18 @@ export function TalentPassportPage() {
 
         {coders.length > 0 && view === 'general' && <>
           <div className="talent-metrics dashboard-kpis">
-            <article><Users /><span>Estudiantes</span><strong>{summary.total}</strong><small>de {summary.allTotal} registrados</small></article>
-            <article><Gauge /><span>Score promedio</span><strong>{summary.avgScore}</strong><small>{levelLabel(summary.avgScore)}</small></article>
-            <article><Trophy /><span>Top performer</span><strong>{summary.top?.score ?? '-'}</strong><small>{summary.top?.name ?? 'Sin datos'}</small></article>
-            <article><Medal /><span>Celula lider</span><strong>{summary.topCell?.avg ?? '-'}</strong><small>{summary.topCell?.cell ?? 'Sin celula'}</small></article>
-            <article><Flame /><span>Evidencia real</span><strong>{summary.coverage}%</strong><small>{summary.stories} historias · {summary.evaluations} evals</small></article>
-            <article><ShieldAlert /><span>Foco prioritario</span><strong>{weakestDimension?.short}</strong><small>{weakestDimension ? groupAvg[weakestDimension.key] : '-'}/100</small></article>
+            <article><Users /><span>Students</span><strong>{summary.total}</strong><small>of {summary.allTotal} registered</small></article>
+            <article><Gauge /><span>Average score</span><strong>{summary.avgScore}</strong><small>{levelLabel(summary.avgScore)}</small></article>
+            <article><Trophy /><span>Top performer</span><strong>{summary.top?.score ?? '-'}</strong><small>{summary.top?.name ?? 'No data'}</small></article>
+            <article><Medal /><span>Top cell</span><strong>{summary.topCell?.avg ?? '-'}</strong><small>{summary.topCell?.cell ?? 'No cell'}</small></article>
+            <article><Flame /><span>Real evidence</span><strong>{summary.coverage}%</strong><small>{summary.stories} stories · {summary.evaluations} evals</small></article>
+            <article><ShieldAlert /><span>Priority focus</span><strong>{weakestDimension?.short}</strong><small>{weakestDimension ? groupAvg[weakestDimension.key] : '-'}/100</small></article>
           </div>
 
           <div className="dashboard-grid-main">
             <section className="passport-panel">
               <div className="passport-title"><div><p className="eyebrow">Ranking de empleabilidad</p><h2>Top coders</h2></div><BarChart3 /></div>
-              <div className="ranking-bars">{filtered.slice(0, 25).map(coder => <button key={`${coder.rank}-${coder.id ?? coder.name}`} onClick={() => { setSelectedCoderId(coder.id || coder.name); setView('student') }}><span>{coder.rank}</span><strong>{coder.name}</strong><i><b style={{ width: `${coder.score}%`, background: scoreColor(coder.score) }} /></i><em>{coder.score}</em></button>)}</div>
+              <div className="ranking-bars">{filtered.slice(0, 25).map(coder => <button key={`${coder.rank}-${coder.id ?? coder.name}`} onClick={() => { setSelectedCoderId(coder.id || coder.name); setSearchParams({ view: 'student' }) }}><span>{coder.rank}</span><strong>{coder.name}</strong><i><b style={{ width: `${coder.score}%`, background: scoreColor(coder.score) }} /></i><em>{coder.score}</em></button>)}</div>
             </section>
 
             <section className="passport-panel">
@@ -278,15 +268,15 @@ export function TalentPassportPage() {
           </div>
 
           <div className="passport-grid passport-grid--bottom">
-            <CellRanking cells={cellRanks} onSelect={cell => { setCellView(cell); setView('celula') }} />
+            <CellRanking cells={cellRanks} onSelect={cell => { setCellView(cell); setSearchParams({ view: 'celula' }) }} />
             <DimensionWeights groupAvg={groupAvg} />
             <section className="passport-panel">
-              <div className="passport-title"><div><p className="eyebrow">Insight operativo</p><h2>Siguiente accion</h2></div><Sparkles /></div>
-              <div className="insight-premium"><p>Priorizar {weakestDimension?.label}</p><span>El grupo puede subir el Employment Score si se refuerza la dimension mas baja y se acompanan coders con tier Bajo durante el siguiente sprint.</span></div>
+              <div className="passport-title"><div><p className="eyebrow">Operational insight</p><h2>Next action</h2></div><Sparkles /></div>
+              <div className="insight-premium"><p>Prioritize {weakestDimension?.label}</p><span>The group can raise the Employment Score by reinforcing the weakest dimension and supporting low-tier coders during the next sprint.</span></div>
             </section>
           </div>
 
-          <StudentTable coders={filtered} onSelect={coder => { setSelectedCoderId(coder.id || coder.name); setView('student') }} />
+          <StudentTable coders={filtered} onSelect={coder => { setSelectedCoderId(coder.id || coder.name); setSearchParams({ view: 'student' }) }} />
           <GapAnalysis />
         </>}
 
@@ -322,7 +312,7 @@ function CompareView({ a, b, coders, setA, setB }: { a: TalentCoder; b: TalentCo
 }
 
 function CompareCard({ coder, side }: { coder: TalentCoder; side: string }) {
-  return <article className={`compare-premium-card compare-premium-card--${side}`}><span>{coder.cell}</span><h2>{coder.name}</h2><p>{coder.email || 'Sin correo visible'}</p><strong>{coder.score}</strong><small>{levelLabel(coder.score)}</small><b className={`tier-badge tier-badge--${tierClass(coder.tier)}`}>{coder.tier}</b></article>
+  return <article className={`compare-premium-card compare-premium-card--${side}`}><span>{coder.cell}</span><h2>{coder.name}</h2><p>{coder.email || 'No email visible'}</p><strong>{coder.score}</strong><small>{levelLabel(coder.score)}</small><b className={`tier-badge tier-badge--${tierClass(coder.tier)}`}>{coder.tier}</b></article>
 }
 
 function StudentView({ selected, coders, groupAvg }: { selected: TalentCoder; coders: TalentCoder[]; groupAvg: Record<DimensionKey, number> }) {
@@ -352,7 +342,7 @@ function InsightsView({ coders, cellRanks, groupAvg, weakestDimension }: { coder
   const top = coders.slice(0, 3)
   const bottom = [...coders].sort((a, b) => a.score - b.score).slice(0, 3)
   const tierCounts = { alto: coders.filter(c => c.tier === 'Alto').length, medio: coders.filter(c => c.tier === 'Medio').length, bajo: coders.filter(c => c.tier === 'Bajo').length }
-  return <div className="insights-grid-v2"><section className="passport-panel insight-board"><div className="passport-title"><div><p className="eyebrow">Resumen ejecutivo</p><h2>Lectura del grupo</h2></div><BrainCircuit /></div><p>El grupo tiene {coders.length} coders evaluados, con {tierCounts.alto} en Alto, {tierCounts.medio} en Medio y {tierCounts.bajo} en Bajo. La celula lider es {cellRanks[0]?.cell ?? 'sin datos'} con promedio {cellRanks[0]?.avg ?? '-'}.</p><p>La dimension con mayor oportunidad es {weakestDimension?.label ?? 'sin datos'}, con promedio {weakestDimension ? groupAvg[weakestDimension.key] : '-'}.</p></section><section className="passport-panel insight-board"><div className="passport-title"><div><p className="eyebrow">Top performers</p><h2>Reconocer y replicar</h2></div><Trophy /></div>{top.map(coder => <article className="insight-row" key={coder.id ?? coder.name}><strong>{coder.name}</strong><span>{coder.cell} - {coder.score} - {levelLabel(coder.score)}</span></article>)}</section><section className="passport-panel insight-board"><div className="passport-title"><div><p className="eyebrow">Plan de accion</p><h2>Proximo sprint</h2></div><Sparkles /></div><ol className="insight-steps"><li>Hacer coaching focalizado a {bottom.map(coder => coder.name).join(', ')}.</li><li>Convertir {weakestDimension?.label ?? 'la dimension baja'} en objetivo explicito del sprint.</li><li>Revisar gaps KPI-008, KPI-009 y KPI-023 antes de prometer historicos.</li></ol></section></div>
+  return <div className="insights-grid-v2"><section className="passport-panel insight-board"><div className="passport-title"><div><p className="eyebrow">Executive summary</p><h2>Group reading</h2></div><BrainCircuit /></div><p>The group has {coders.length} evaluated coders, with {tierCounts.alto} High, {tierCounts.medio} Mid and {tierCounts.bajo} Low. Top cell is {cellRanks[0]?.cell ?? 'no data'} with average {cellRanks[0]?.avg ?? '-'}.</p><p>The dimension with the most opportunity is {weakestDimension?.label ?? 'no data'}, with average {weakestDimension ? groupAvg[weakestDimension.key] : '-'}.</p></section><section className="passport-panel insight-board"><div className="passport-title"><div><p className="eyebrow">Top performers</p><h2>Recognize and replicate</h2></div><Trophy /></div>{top.map(coder => <article className="insight-row" key={coder.id ?? coder.name}><strong>{coder.name}</strong><span>{coder.cell} - {coder.score} - {levelLabel(coder.score)}</span></article>)}</section><section className="passport-panel insight-board"><div className="passport-title"><div><p className="eyebrow">Action plan</p><h2>Next sprint</h2></div><Sparkles /></div><ol className="insight-steps"><li>Focused coaching for {bottom.map(coder => coder.name).join(', ')}.</li><li>Make {weakestDimension?.label ?? 'the weakest dimension'} an explicit sprint goal.</li><li>Review gaps KPI-008, KPI-009 and KPI-023 before committing to historical data.</li></ol></section></div>
 }
 
 function GapAnalysis() {

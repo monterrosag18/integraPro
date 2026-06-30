@@ -1,20 +1,21 @@
-import { BrainCircuit, Send, Sparkles, X } from 'lucide-react'
+import { Send, Sparkles, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { apiRequest } from '../../shared/api/httpClient'
 
 type Message = { role: 'user' | 'ai'; text: string }
 
 const SUGGESTIONS = [
-  '¿Cuántos coders hay activos?',
-  '¿Qué sprints están en curso?',
-  '¿Cómo van los proyectos?',
-  '¿Qué es La Rosa en B612?',
+  'Top 3 coders',
+  'Coders en riesgo',
+  'Mejor célula',
+  'Dimensión más débil',
+  'Quién mejoró más',
 ]
 
 export function ChatBot() {
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
-    { role: 'ai', text: '¡Hola! Soy B612 AI, tu asistente inteligente. Puedo ayudarte con datos del sistema, aclarar conceptos de la plataforma o darte un resumen del estado actual. ¿Qué necesitas?' }
+    { role: 'ai', text: 'Hola, soy el asistente B612. Pregúntame sobre scores, coders, células, dimensiones o tendencias del programa.' }
   ])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -30,9 +31,12 @@ export function ChatBot() {
     setInput('')
     setLoading(true)
     try {
+      const history = messages
+        .slice(-6)
+        .map(m => ({ role: m.role === 'ai' ? 'assistant' : 'user', content: m.text }))
       const data = await apiRequest<{ response: string }>('/ai/chat', {
         method: 'POST',
-        body: JSON.stringify({ message: text.trim() }),
+        body: JSON.stringify({ message: text.trim(), history }),
       })
       setMessages(prev => [...prev, { role: 'ai', text: data.response }])
     } catch {
@@ -47,7 +51,7 @@ export function ChatBot() {
       {open && (
         <div className="chatbot-panel">
           <div className="chatbot-header">
-            <div><BrainCircuit size={20} /><strong>B612 AI</strong><span>Asistente inteligente</span></div>
+            <div><img src="/images/dashboard/fox-chat-assistant-v1.png" alt="" className="chatbot-header__fox" /><strong>B612 AI</strong><span>Smart assistant</span></div>
             <button type="button" onClick={() => setOpen(false)}><X size={18} /></button>
           </div>
 
@@ -92,7 +96,7 @@ export function ChatBot() {
       )}
 
       <button className={`chatbot-toggle${open ? ' chatbot-toggle--active' : ''}`} type="button" onClick={() => setOpen(o => !o)}>
-        <BrainCircuit size={20} />
+        <img src="/images/dashboard/fox-chat-assistant-v1.png" alt="B612 AI" className="chatbot-toggle__fox" />
         <span>B612 AI</span>
       </button>
     </>

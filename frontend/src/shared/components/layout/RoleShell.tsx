@@ -1,4 +1,5 @@
-import { Bell, BookOpenText, Building2, CalendarDays, ChartNoAxesCombined, ChevronDown, ClipboardCheck, Flower2 as Rose, FolderKanban, LayoutDashboard, LogOut, Orbit, PanelLeftClose, Search, Settings, Shuffle, Sparkles, Trophy, Users } from 'lucide-react'
+import { ArrowLeft, BarChart3, Bell, BookOpen, BookOpenText, BrainCircuit, Building2, CalendarDays, ChartNoAxesCombined, ChevronDown, ClipboardCheck, Flame, Flower2 as Rose, FolderKanban, Gauge, LayoutDashboard, LogOut, Medal, Orbit, PanelLeftClose, Search, Settings, Shuffle, Sparkles, Trophy, Users } from 'lucide-react'
+import { ChatBot } from '../../../features/chatbot/ChatBot'
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../../api/httpClient'
@@ -7,6 +8,16 @@ import { clearSession, getCurrentUser } from '../../auth/session'
 type Role = 'Admin' | 'TL' | 'Líder' | 'Coder'
 type MenuItem = { label: string; slug: string; icon: typeof LayoutDashboard }
 type NotificationItem = { id: string; title: string; body: string; type: string; url: string | null; readAt: string | null; createdAt: string }
+
+const talentPassportItems: Array<{ view: string; label: string; icon: typeof BarChart3 }> = [
+  { view: 'general',    label: 'General',   icon: BarChart3    },
+  { view: 'comparador', label: 'Compare',   icon: Gauge        },
+  { view: 'student',    label: 'Coder',     icon: Users        },
+  { view: 'celula',     label: 'Cell',      icon: Medal        },
+  { view: 'heatmap',    label: 'Heatmap',   icon: Flame        },
+  { view: 'kpis',       label: 'KPIs',      icon: BookOpen     },
+  { view: 'insights',   label: 'Insights',  icon: BrainCircuit },
+]
 
 const menus: Record<Role, MenuItem[]> = {
   Admin: [{ label:'Resumen',slug:'',icon:LayoutDashboard },{ label:'Talent Passport',slug:'talent-passport',icon:Trophy },{ label:'Campus',slug:'campus',icon:Building2 },{ label:'Cohortes',slug:'cohortes',icon:Users },{ label:'Clanes',slug:'clanes',icon:Orbit },{ label:'Usuarios',slug:'usuarios',icon:Users },{ label:'Criterios',slug:'criterios',icon:ClipboardCheck }],
@@ -96,7 +107,17 @@ export function RoleShell({ role, name, children }: { role: Role; name: string; 
         <div className="sidebar-brand-row"><Link className="brand" to="/"><span>B</span><div>B612<small>Scrum Universe</small></div></Link><button aria-label="Contraer menú" onClick={() => setCollapsed(!collapsed)}><PanelLeftClose size={18} /></button></div>
         <button className="profile profile--premium profile--button" onClick={() => setShowSettings(true)}><div className="profile__avatar">{initials}<i /></div><div><strong>{displayName}</strong><span>{role} · Online</span></div><ChevronDown size={16} /></button>
         <div className="context-card context-card--planet"><div className="mini-planet" /><div><span>Contexto actual</span><strong>{contextTitle}</strong><small>{contextDetail}</small></div></div>
-        <nav aria-label={`Navegación de ${role}`}>{menus[role].map(({ label, slug, icon: Icon }) => {const path=`/app/${rolePath}${slug?`/${slug}`:''}`;const active=location.pathname===path;return <Link className={active?'nav-item nav-item--active':'nav-item'} to={path} key={label}><Icon size={18}/><span>{label}</span>{active&&<i/>}</Link>})}</nav>
+        {location.pathname === '/app/admin/talent-passport' ? (
+          <nav aria-label="Talent Passport">
+            <Link className="nav-item nav-item--back" to="/app/admin"><ArrowLeft size={16}/><span>Admin</span></Link>
+            {talentPassportItems.map(({ view, label, icon: Icon }) => {
+              const active = (new URLSearchParams(location.search).get('view') ?? 'general') === view
+              return <Link className={active ? 'nav-item nav-item--active' : 'nav-item'} to={`/app/admin/talent-passport?view=${view}`} key={view}><Icon size={18}/><span>{label}</span>{active && <i/>}</Link>
+            })}
+          </nav>
+        ) : (
+          <nav aria-label={`Navegación de ${role}`}>{menus[role].map(({ label, slug, icon: Icon }) => {const path=`/app/${rolePath}${slug?`/${slug}`:''}`;const active=location.pathname===path;return <Link className={active?'nav-item nav-item--active':'nav-item'} to={path} key={label}><Icon size={18}/><span>{label}</span>{active&&<i/>}</Link>})}</nav>
+        )}
         <div className="sidebar-rose"><div><Rose size={28} /><span>La Rosa</span></div><p>El crecimiento de tu equipo deja una huella.</p><div className="rose-progress"><i style={{ width: `${Math.min(100, ((roses ?? 0) / 10) * 100)}%` }} /></div><small>{roses !== null ? `${roses} de 10 pétalos` : '— pétalos'}</small></div>
         <div className="sidebar-actions"><button onClick={() => setShowSettings(true)}><Settings size={17} /><span>Configuración</span></button><Link to="/login" onClick={clearSession}><LogOut size={17} /><span>Salir</span></Link></div>
       </aside>
@@ -118,6 +139,7 @@ export function RoleShell({ role, name, children }: { role: Role; name: string; 
       }}><Bell size={16}/><span><strong>{item.title}</strong><small>{item.body}</small><time style={{ fontSize: '0.7rem', opacity: 0.55, display: 'block', marginTop: '2px' }}>{new Date(item.createdAt).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</time></span>{!item.readAt && <i/>}</button>)}<div><button className="ghost-small" onClick={() => setShowNotifications(false)}>Cerrar</button><button className="primary-button" onClick={() => { setShowNotifications(false); markNotificationsRead() }}>Marcar leídas</button></div></section></div>}
       {showSettings && <div className="modal-backdrop" onMouseDown={() => setShowSettings(false)}><form className="modal-card modal-card--side" onMouseDown={event => event.stopPropagation()} onSubmit={event => { event.preventDefault(); setShowSettings(false); toast('Preferencias guardadas en esta sesión') }}><p className="eyebrow">Preferencias</p><h2>Configuración de {displayName}</h2><label>Nombre visible<input defaultValue={displayName}/></label><label>Vista inicial<select defaultValue={location.pathname}><option value={location.pathname}>Vista actual</option>{searchableItems.map(item => <option value={item.path} key={item.path}>{item.label}</option>)}</select></label><label className="toggle-row"><input type="checkbox" defaultChecked/> Activar notificaciones del sprint</label><label className="toggle-row"><input type="checkbox" defaultChecked/> Modo premium visual</label><div><button type="button" className="ghost-small" onClick={() => setShowSettings(false)}>Cancelar</button><button className="primary-button">Guardar cambios</button></div></form></div>}
       {notice && <div className="prototype-toast"><Sparkles size={17}/>{notice}</div>}
+      {role === 'Admin' && <ChatBot />}
     </div>
   )
 }

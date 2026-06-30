@@ -3,7 +3,6 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { apiRequest } from '../../shared/api/httpClient'
 import { getCurrentUser } from '../../shared/auth/session'
-import { ChatBot } from '../../features/chatbot/ChatBot'
 import { RoleShell } from '../../shared/components/layout/RoleShell'
 
 type Summary = { campuses: number; cohorts: number; clans: number; cells: number; coders: number; tls: number; activeSprints: number; projects: number; stories: number }
@@ -140,7 +139,6 @@ export function AdminDashboardPage() {
       </div>}
 
       {notice && <div className="prototype-toast"><ArrowUpRight size={17} />{notice}</div>}
-      <ChatBot />
     </RoleShell>
   )
 }
