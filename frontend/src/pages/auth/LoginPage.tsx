@@ -26,7 +26,7 @@ export function LoginPage() {
       saveSession(session)
       navigate(session.user.homePath || roleHomePath(session.user.role), { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'No pudimos entrar al universo.')
+      setError(err instanceof Error ? err.message : 'We could not enter the universe.')
     } finally {
       setLoading(false)
     }
@@ -44,21 +44,21 @@ export function LoginPage() {
         </div>
         <div className="login-quote">
           <span>“</span>
-          <p>El universo reconoce tu rol y abre solo la vista que te corresponde.</p>
+          <p>The universe recognizes your role and opens only your assigned view.</p>
         </div>
       </div>
 
       <section className="login-v2__panel">
-        <Link className="back-link" to="/"><ArrowLeft /> Volver al universo</Link>
+        <Link className="back-link" to="/"><ArrowLeft /> Back to the universe</Link>
         <div className="login-heading">
-          <p className="eyebrow">Acceso real B612</p>
-          <h1>Ingresa a tu planeta</h1>
-          <p>Usa el correo y contraseña asignados. No hay registro: el rol viene directamente desde la base de datos.</p>
+          <p className="eyebrow">Real B612 access</p>
+          <h1>Enter your planet</h1>
+          <p>Use your assigned email and password. There is no sign-up flow: your role comes directly from the database.</p>
         </div>
 
         <form className="real-login-form" onSubmit={submit}>
           <label>
-            <span><Mail /> Correo institucional</span>
+            <span><Mail /> Institutional email</span>
             <input
               autoComplete="email"
               inputMode="email"
@@ -70,7 +70,7 @@ export function LoginPage() {
             />
           </label>
           <label>
-            <span><KeyRound /> Contraseña</span>
+            <span><KeyRound /> Password</span>
             <input
               autoComplete="current-password"
               placeholder="••••••••"
@@ -85,14 +85,14 @@ export function LoginPage() {
 
           <button className="primary-button login-submit" disabled={loading}>
             {loading ? <Loader2 className="spin" /> : <Sparkles />}
-            {loading ? 'Validando órbita...' : 'Entrar al universo'}
+            {loading ? 'Validating orbit...' : 'Enter the universe'}
             {!loading && <ArrowRight />}
           </button>
         </form>
 
         <div className="login-note login-note--real">
           <ShieldCheck />
-          <span>La app consulta PostgreSQL remoto y redirige por rol: admin, TL o coder.</span>
+          <span>The app queries remote PostgreSQL and redirects by role: admin, TL, or coder.</span>
         </div>
       </section>
     </main>
