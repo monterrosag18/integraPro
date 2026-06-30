@@ -1,10 +1,16 @@
 import { getSession } from '../auth/session'
 
-const API_URL = import.meta.env.VITE_API_URL ?? '/api'
+const rawApiUrl = String(import.meta.env.VITE_API_URL ?? '').trim()
+const API_URL = (rawApiUrl || '/api').replace(/\/+$/, '')
+
+function apiUrl(path: string) {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`
+  return `${API_URL}${normalizedPath}`
+}
 
 export async function apiRequest<T>(path: string, options?: RequestInit): Promise<T> {
   const session = getSession()
-  const response = await fetch(`${API_URL}${path}`, {
+  const response = await fetch(apiUrl(path), {
     ...options,
     headers: {
       'Content-Type': 'application/json',
