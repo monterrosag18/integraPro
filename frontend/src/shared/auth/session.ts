@@ -45,5 +45,5 @@ export function getCurrentUser(): AuthUser | null {
 export function roleHomePath(role: string) {
   if (role === 'admin') return '/app/admin/talent-passport'
   if (role === 'tl') return '/app/tl'
-  return '/app/coder'
+  return '/app/coder/tablero'
 }

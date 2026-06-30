@@ -2,7 +2,7 @@ import { BookOpenText, ChevronDown, Edit3, Expand, FileText, Minimize2 } from 'l
 import { useState } from 'react'
 import ReactMarkdown from 'react-markdown'
 
-const markdown = `## Misión del Sprint 04
+const markdown = `## Misión del sprint
 
 Construir una experiencia donde cada coder pueda **ver su progreso**, colaborar con su célula y dejar evidencia real de lo aprendido.
 

@@ -1,43 +1,139 @@
-import { ArrowUpRight, CheckCircle2, Filter, Plus, Search, Sparkles, X } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import { ArrowUpRight, Filter, Search, Sparkles, X } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
 import { Navigate, useParams } from 'react-router-dom'
 import { DocumentationPanel } from '../../features/documentation/components/DocumentationPanel'
+import { apiRequest } from '../../shared/api/httpClient'
+import { getCurrentUser } from '../../shared/auth/session'
 import { RoleShell } from '../../shared/components/layout/RoleShell'
 
-type Role='Admin'|'TL'|'Líder'
-type Config={title:string;eyebrow:string;description:string;columns:string[];rows:string[][];stats:[string,string][]}
-
-const configs:Record<string,Config>={
-  'admin/campus':{title:'Campus',eyebrow:'Estructura académica',description:'Sedes desde donde se organizan cohortes, clanes y coders.',columns:['Campus','Ciudad','Cohortes','Estado'],rows:[['Medellín','Medellín','4','Activo'],['Barranquilla','Barranquilla','3','Activo']],stats:[['02','Campus'],['07','Cohortes'],['256','Coders']]},
-  'admin/cohortes':{title:'Cohortes',eyebrow:'Organización',description:'Consulta y organiza los grupos activos de cada campus.',columns:['Cohorte','Campus','Clanes','Coders','Estado'],rows:[['Cohorte 6','Medellín','4','64','Activa'],['Cohorte 7','Barranquilla','4','64','Activa'],['Cohorte 8','Medellín','0','0','Preparación']],stats:[['03','Visibles'],['08','Clanes'],['128','Coders']]},
-  'admin/clanes':{title:'Clanes',eyebrow:'Estructura académica',description:'Clanes, células y TL responsables por cohorte.',columns:['Clan','Cohorte','TL técnico','Células','Estado'],rows:[['Van Rossum','Cohorte 6','Alex R.','4','Activo'],['Lovelace','Cohorte 6','María S.','4','Activo'],['Turing','Cohorte 7','Camilo G.','4','Activo']],stats:[['08','Clanes'],['32','Células'],['12','TL asignados']]},
-  'admin/usuarios':{title:'Usuarios',eyebrow:'Identidad y acceso',description:'Administra cuentas, roles y estado de acceso.',columns:['Nombre','Correo','Rol','Contexto','Estado'],rows:[['Laura Martínez','laura@riwi.io','Coder','Van Rossum','Activo'],['Juan López','juan@riwi.io','Coder · Líder','Célula Cosmos','Activo'],['Alex Rivera','alex@riwi.io','TL técnico','Van Rossum','Activo'],['Ana Admin','ana@riwi.io','Admin','Global','Activo']],stats:[['132','Activos'],['3','Roles'],['04','Pendientes']]},
-  'admin/criterios':{title:'Criterios de evaluación',eyebrow:'Calidad de datos',description:'Catálogo configurable para evaluar proyectos y personas.',columns:['Criterio','Alcance','Peso sugerido','Uso','Estado'],rows:[['Calidad técnica','Proyecto','30%','Review','Activo'],['Comunicación','Persona','20%','Retrospectiva','Activo'],['Trabajo en equipo','Persona','25%','Retrospectiva','Activo'],['Documentación','Proyecto','15%','Review','Activo']],stats:[['12','Criterios'],['02','Alcances'],['100%','Configurado']]},
-  'tl/resumen':{title:'Pulso del clan',eyebrow:'Van Rossum',description:'Una vista consolidada del sprint, las células y sus pendientes.',columns:['Célula','Líder','Avance','Evaluaciones','Estado'],rows:[['Cosmos','Juan López','76%','10/12','En curso'],['Nebulosa','Sara Díaz','68%','8/12','En curso'],['Aurora','Mateo Ruiz','83%','12/12','Al día'],['Órbita','Valentina C.','61%','7/12','Atención']],stats:[['04','Células'],['16','Coders'],['72%','Avance medio']]},
-  'tl/sprints':{title:'Sprints',eyebrow:'Calendario del clan',description:'Configura fechas y controla el ciclo completo de cada sprint.',columns:['Sprint','Inicio','Fin','Células','Estado'],rows:[['Sprint 04','17 Jun 2026','30 Jun 2026','4','Activo'],['Sprint 03','03 Jun 2026','16 Jun 2026','4','Cerrado'],['Sprint 02','20 May 2026','02 Jun 2026','4','Cerrado']],stats:[['04','Sprint actual'],['06 días','Restantes'],['100%','Rotación']]},
-  'tl/celulas':{title:'Células',eyebrow:'Tripulaciones',description:'Consulta líderes, rotadores y proyectos del sprint activo.',columns:['Célula','Líder','Rotadores','Proyecto','Avance'],rows:[['Cosmos','Juan López','3','API seguimiento','76%'],['Nebulosa','Sara Díaz','3','Portal académico','68%'],['Aurora','Mateo Ruiz','3','Dashboard clan','83%'],['Órbita','Valentina C.','3','Gestor de retos','61%']],stats:[['04','Células'],['04','Líderes'],['12','Rotadores']]},
-  'tl/evaluaciones':{title:'Evaluaciones',eyebrow:'Empleabilidad',description:'Seguimiento agregado y anónimo de reviews y retrospectivas.',columns:['Célula','Ceremonia','Esperadas','Recibidas','Estado'],rows:[['Cosmos','Retrospectiva','12','10','En curso'],['Nebulosa','Retrospectiva','12','8','Pendiente'],['Aurora','Review','3','3','Completa'],['Órbita','Review','3','2','En curso']],stats:[['23','Recibidas'],['30','Esperadas'],['77%','Completitud']]},
-  'tl/rosa':{title:'La Rosa',eyebrow:'Reconocimiento',description:'Entrega el reconocimiento del sprint y consulta su historial.',columns:['Sprint','Célula ganadora','Proyecto','Otorgada por','Estado'],rows:[['Sprint 03','Aurora','Dashboard clan','Alex R.','Otorgada'],['Sprint 02','Cosmos','API seguimiento','Alex R.','Otorgada'],['Sprint 01','Nebulosa','Portal académico','Alex R.','Otorgada']],stats:[['03','Entregadas'],['12','Coders reconocidos'],['01','Por decidir']]},
-  'tl/documentacion':{title:'Documentación del clan',eyebrow:'README compartido',description:'Publica lineamientos Markdown visibles para todas las células.',columns:['Documento','Alcance','Autor','Versión','Estado'],rows:[['Guía Sprint 04','Clan','Alex R.','v3','Publicado'],['Estándares Git','Clan','Alex R.','v2','Publicado'],['Checklist Review','Clan','María S.','v1','Borrador']],stats:[['03','Documentos'],['02','Publicados'],['v3','Última versión']]},
-  'leader/proyecto':{title:'Proyecto de la célula',eyebrow:'API de seguimiento',description:'Información general, repositorio y entregables del sprint.',columns:['Entregable','Responsable','Fecha','Progreso','Estado'],rows:[['API REST','Laura M.','26 Jun','72%','En curso'],['Dashboard','Daniel R.','28 Jun','54%','En curso'],['README técnico','Camila T.','29 Jun','85%','Revisión']],stats:[['03','Entregables'],['01','Repositorio'],['70%','Avance']]},
-  'leader/backlog':{title:'Backlog',eyebrow:'Historias de usuario',description:'Prioriza las historias que alimentan el tablero de la célula.',columns:['Historia','Título','Prioridad','Estimación','Responsable'],rows:[['HU-14','Definir endpoints','Alta','5 pts','Laura M.'],['HU-18','Diseñar perfil','Media','3 pts','Camila T.'],['HU-21','Registrar evaluación','Alta','8 pts','Daniel R.'],['HU-22','Publicar README','Baja','2 pts','Sin asignar']],stats:[['12','Historias'],['31','Story points'],['03','Sin asignar']]},
-  'leader/ceremonias':{title:'Ceremonias',eyebrow:'Ciclo Scrum',description:'Registra planning, review y retrospectiva del proyecto.',columns:['Ceremonia','Fecha','Responsable','Evidencia','Estado'],rows:[['Planning','17 Jun','Juan Líder','Objetivo definido','Cerrada'],['Review','29 Jun','Juan Líder','Pendiente','Programada'],['Retrospectiva','30 Jun','Toda la célula','Pendiente','Programada']],stats:[['03','Ceremonias'],['01','Completada'],['02','Próximas']]},
-  'leader/evaluaciones':{title:'Evaluaciones',eyebrow:'Retroalimentación',description:'Completa las evaluaciones requeridas sin revelar identidades.',columns:['Evaluación','Sujeto','Criterios','Fecha límite','Estado'],rows:[['Review de proyecto','API seguimiento','6','29 Jun','Pendiente'],['Evaluación de Laura','Coder','5','30 Jun','Completada'],['Evaluación de Daniel','Coder','5','30 Jun','En progreso'],['Autoevaluación','Juan Líder','5','30 Jun','Pendiente']],stats:[['04','Requeridas'],['01','Completada'],['25%','Avance']]},
+type Role = 'Admin' | 'TL' | 'Líder'
+type Config = {
+  title: string
+  eyebrow: string
+  description: string
+  columns: string[]
+  rows: string[][]
+  stats: string[][]
 }
 
-export function PrototypeModulePage({role}:{role:Role}){
-  const {section}=useParams()
-  const roleKey=role==='Líder'?'leader':role.toLowerCase()
-  const key=`${roleKey}/${section||'resumen'}`
-  const config=configs[key]
-  const [query,setQuery]=useState('')
-  const [records,setRecords]=useState(config?.rows??[])
-  const [showCreate,setShowCreate]=useState(false)
-  const [notice,setNotice]=useState('')
-  const [selected,setSelected]=useState<string[]|null>(null)
-  const filtered=useMemo(()=>records.filter(row=>row.join(' ').toLowerCase().includes(query.toLowerCase())),[records,query])
-  if(!config)return <Navigate to={`/app/${roleKey}`} replace/>
-  const name=role==='Admin'?'Ana Admin':role==='TL'?'Alex R.':'Juan Líder'
-  const addRecord=(form:FormData)=>{const first=String(form.get('name')||'Nuevo registro');setRecords(current=>[[first,...config.columns.slice(1).map((_,index)=>index===config.columns.length-2?'Prototipo':'—')],...current]);setShowCreate(false);setNotice('Registro agregado al prototipo');setTimeout(()=>setNotice(''),2200)}
-  return <RoleShell role={role} name={name}><header className="prototype-header"><div><p className="eyebrow">{config.eyebrow}</p><h1>{config.title}</h1><p>{config.description}</p></div><button className="primary-button" onClick={()=>setShowCreate(true)}><Plus size={17}/> Nuevo registro</button></header><div className="prototype-stats">{config.stats.map(([value,label])=><article key={label}><Sparkles/><strong>{value}</strong><span>{label}</span></article>)}</div><section className="prototype-table-card"><div className="prototype-toolbar"><label><Search/><input value={query} onChange={event=>setQuery(event.target.value)} placeholder={`Buscar en ${config.title.toLowerCase()}...`}/></label><button onClick={()=>{setQuery('');setNotice('Filtros limpiados');setTimeout(()=>setNotice(''),2200)}}><Filter/> Limpiar filtros</button><span>{filtered.length} registros</span></div><div className="prototype-table-scroll"><table className="prototype-table"><thead><tr>{config.columns.map(column=><th key={column}>{column}</th>)}<th/></tr></thead><tbody>{filtered.map((row,index)=><tr key={`${row[0]}-${index}`}>{row.map((cell,cellIndex)=><td key={cellIndex}>{cellIndex===row.length-1?<span className="prototype-status"><i/>{cell}</span>:cell}</td>)}<td><button onClick={()=>setSelected(row)}>Ver <ArrowUpRight/></button></td></tr>)}</tbody></table></div>{filtered.length===0&&<div className="prototype-empty">No encontramos registros con ese filtro.</div>}</section>{key==='tl/documentacion'&&<DocumentationPanel/>}{selected&&<div className="modal-backdrop" onMouseDown={()=>setSelected(null)}><section className="modal-card modal-card--side" onMouseDown={event=>event.stopPropagation()}><button type="button" className="prototype-modal-close" onClick={()=>setSelected(null)}><X/></button><p className="eyebrow">{config.title}</p><h2>{selected[0]}</h2><div className="record-detail-list">{config.columns.map((column,index)=><article key={column}><span>{column}</span><strong>{selected[index]??'—'}</strong></article>)}</div><div><button className="ghost-small" onClick={()=>{setRecords(current=>[selected,...current]);setSelected(null);setNotice('Registro duplicado en prototipo');setTimeout(()=>setNotice(''),2200)}}>Duplicar</button><button className="primary-button" onClick={()=>{setSelected(null);setNotice(`${selected[0]} actualizado en prototipo`);setTimeout(()=>setNotice(''),2200)}}><CheckCircle2/> Marcar revisado</button></div></section></div>}{showCreate&&<div className="modal-backdrop" onMouseDown={()=>setShowCreate(false)}><form className="modal-card" onMouseDown={event=>event.stopPropagation()} onSubmit={event=>{event.preventDefault();addRecord(new FormData(event.currentTarget))}}><button type="button" className="prototype-modal-close" onClick={()=>setShowCreate(false)}><X/></button><p className="eyebrow">Datos demostrativos</p><h2>Nuevo registro</h2><label>{config.columns[0]}<input name="name" required autoFocus placeholder={`Nombre de ${config.columns[0].toLowerCase()}`}/></label><label>Estado<select name="status"><option>Activo</option><option>Preparación</option><option>Borrador</option></select></label><small>Este registro vivirá únicamente durante la sesión actual.</small><div><button type="button" className="ghost-small" onClick={()=>setShowCreate(false)}>Cancelar</button><button className="primary-button"><CheckCircle2/> Guardar prototipo</button></div></form></div>}{notice&&<div className="prototype-toast"><CheckCircle2/>{notice}</div>}</RoleShell>
+const shells: Record<string, Config> = {
+  'admin/campus': emptyConfig('Campus', 'Estructura academica', 'Sedes desde donde se organizan cohortes, clanes y coders.', ['Campus', 'Ciudad', 'Cohortes', 'Coders', 'Estado']),
+  'admin/cohortes': emptyConfig('Cohortes', 'Organizacion', 'Consulta y organiza los grupos activos de cada campus.', ['Cohorte', 'Campus', 'Clanes', 'Coders', 'Estado']),
+  'admin/clanes': emptyConfig('Clanes', 'Estructura academica', 'Clanes, celulas y TL responsables por cohorte.', ['Clan', 'Cohorte', 'TL', 'Celulas', 'Estado']),
+  'admin/usuarios': emptyConfig('Usuarios', 'Identidad y acceso', 'Administra cuentas, roles y estado de acceso.', ['Nombre', 'Correo', 'Rol', 'Contexto', 'Estado']),
+  'admin/criterios': emptyConfig('Criterios de evaluacion', 'Calidad de datos', 'Catalogo configurable para evaluar proyectos y personas.', ['Criterio', 'Alcance', 'Uso', 'Scores', 'Estado']),
+  'tl/resumen': emptyConfig('Pulso del clan', 'Resumen real', 'Vista consolidada de clanes, celulas y avance.', ['Clan', 'Celulas', 'Sprints', 'Historias', 'Estado']),
+  'tl/sprints': emptyConfig('Sprints', 'Calendario del clan', 'Configura fechas y controla el ciclo completo de cada sprint.', ['Sprint', 'Inicio', 'Fin', 'Clanes/Celulas', 'Estado']),
+  'tl/celulas': emptyConfig('Celulas', 'Tripulaciones', 'Consulta lideres, rotadores y proyectos del sprint activo.', ['Celula', 'Lider', 'Rotadores', 'Proyecto', 'Avance']),
+  'tl/evaluaciones': emptyConfig('Evaluaciones', 'Empleabilidad', 'Seguimiento agregado de reviews y retrospectivas.', ['Tipo', 'Sujeto', 'Scores', 'Promedio', 'Estado']),
+  'tl/rosa': emptyConfig('La Rosa', 'Reconocimiento', 'Consulta el historial real de rosas del sprint.', ['Sprint', 'Celula ganadora', 'Clan', 'Coders reconocidos', 'Estado']),
+  'tl/documentacion': emptyConfig('Documentacion del clan', 'README compartido', 'Publica lineamientos Markdown visibles para todas las celulas.', ['Documento', 'Alcance', 'Autor', 'Version', 'Estado']),
+  'leader/proyecto': emptyConfig('Proyecto de la celula', 'Trabajo real', 'Informacion general, repositorio y entregables del sprint.', ['Proyecto', 'Celula', 'Sprint', 'Historias', 'Estado']),
+  'leader/backlog': emptyConfig('Backlog', 'Historias de usuario', 'Historias reales que alimentan el tablero de la celula.', ['Historia', 'Titulo', 'Prioridad', 'Estimacion', 'Responsable']),
+  'leader/ceremonias': emptyConfig('Ceremonias', 'Ciclo Scrum', 'Planning, review y retrospectiva del proyecto.', ['Ceremonia', 'Fecha', 'Proyecto', 'Evidencia', 'Estado']),
+  'leader/evaluaciones': emptyConfig('Evaluaciones', 'Retroalimentacion', 'Evaluaciones reales sin revelar identidades.', ['Evaluacion', 'Sujeto', 'Criterios', 'Promedio', 'Estado']),
+}
+
+function emptyConfig(title: string, eyebrow: string, description: string, columns: string[]): Config {
+  return { title, eyebrow, description, columns, rows: [], stats: [] }
+}
+
+export function PrototypeModulePage({ role }: { role: Role }) {
+  const { section } = useParams()
+  const roleKey = role === 'Líder' ? 'leader' : role.toLowerCase()
+  const key = `${roleKey}/${section || 'resumen'}`
+  const shell = shells[key]
+  const [config, setConfig] = useState<Config | null>(null)
+  const [query, setQuery] = useState('')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [selected, setSelected] = useState<string[] | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setLoadError('')
+    setConfig(null)
+    apiRequest<Config>(`/dashboard/module/${roleKey}/${section || 'resumen'}`)
+      .then(payload => setConfig(payload))
+      .catch((error: unknown) => {
+        setLoadError(error instanceof Error ? error.message : 'No se pudo cargar la vista real.')
+        setConfig(shell ?? null)
+      })
+      .finally(() => setLoading(false))
+  }, [roleKey, section, shell])
+
+  const current = config ?? shell
+  const rows = current?.rows ?? []
+  const filtered = useMemo(
+    () => rows.filter(row => row.join(' ').toLowerCase().includes(query.toLowerCase())),
+    [query, rows]
+  )
+
+  if (!current) return <Navigate to={`/app/${roleKey}`} replace />
+
+  const sessionUser = getCurrentUser()
+  const name = sessionUser?.fullName ?? (role === 'Admin' ? 'Admin B612' : role === 'TL' ? 'TL B612' : 'Líder B612')
+  const stats = current.stats.length ? current.stats : [['...', loading ? 'Cargando VPS' : 'Sin datos']]
+  return (
+    <RoleShell role={role} name={name}>
+      <header className="prototype-header">
+        <div>
+          <p className="eyebrow">{current.eyebrow}</p>
+          <h1>{current.title}</h1>
+          <p>{current.description}</p>
+          {loadError && <p className="dashboard-error">{loadError}</p>}
+        </div>
+      </header>
+
+      <div className="prototype-stats">
+        {stats.map(([value, label]) => (
+          <article key={label}><Sparkles /><strong>{value}</strong><span>{label}</span></article>
+        ))}
+      </div>
+
+      <section className="prototype-table-card">
+        <div className="prototype-toolbar">
+          <label><Search /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Buscar en ${current.title.toLowerCase()}...`} /></label>
+          <button onClick={() => setQuery('')}><Filter /> Limpiar filtros</button>
+          <span>{loading ? 'Cargando...' : `${filtered.length} registros reales`}</span>
+        </div>
+
+        <div className="prototype-table-scroll">
+          <table className="prototype-table">
+            <thead><tr>{current.columns.map(column => <th key={column}>{column}</th>)}<th /></tr></thead>
+            <tbody>
+              {filtered.map((row, index) => (
+                <tr key={`${row[0]}-${index}`}>
+                  {row.map((cell, cellIndex) => (
+                    <td key={cellIndex}>{cellIndex === row.length - 1 ? <span className="prototype-status"><i />{cell}</span> : cell}</td>
+                  ))}
+                  <td><button onClick={() => setSelected(row)}>Ver <ArrowUpRight /></button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        {!loading && filtered.length === 0 && <div className="prototype-empty">No hay registros reales para esta vista o filtro.</div>}
+      </section>
+
+      {key === 'tl/documentacion' && <DocumentationPanel />}
+
+      {selected && (
+        <div className="modal-backdrop" onMouseDown={() => setSelected(null)}>
+          <section className="modal-card modal-card--side" onMouseDown={event => event.stopPropagation()}>
+            <button type="button" className="prototype-modal-close" onClick={() => setSelected(null)}><X /></button>
+            <p className="eyebrow">{current.title}</p>
+            <h2>{selected[0]}</h2>
+            <div className="record-detail-list">
+              {current.columns.map((column, index) => <article key={column}><span>{column}</span><strong>{selected[index] ?? '-'}</strong></article>)}
+            </div>
+            <div>
+              <button className="ghost-small" onClick={() => setSelected(null)}>Cerrar</button>
+            </div>
+          </section>
+        </div>
+      )}
+
+    </RoleShell>
+  )
 }

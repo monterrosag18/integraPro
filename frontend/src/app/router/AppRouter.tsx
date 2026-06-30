@@ -7,8 +7,6 @@ const LoginPage = lazy(() => import('../../pages/auth/LoginPage').then(module =>
 const AdminDashboardPage = lazy(() => import('../../pages/admin/AdminDashboardPage').then(module => ({ default: module.AdminDashboardPage })))
 const TlDashboardPage = lazy(() => import('../../pages/tl/TlDashboardPage').then(module => ({ default: module.TlDashboardPage })))
 const TalentPassportPage = lazy(() => import('../../pages/admin/TalentPassportPage').then(module => ({ default: module.TalentPassportPage })))
-const LeaderDashboardPage = lazy(() => import('../../pages/leader/LeaderDashboardPage').then(module => ({ default: module.LeaderDashboardPage })))
-const WorkspacePage = lazy(() => import('../../pages/workspace/WorkspacePage').then(module => ({ default: module.WorkspacePage })))
 const CoderSpacePage = lazy(() => import('../../pages/workspace/CoderSpacePage').then(module => ({ default: module.CoderSpacePage })))
 const PrototypeModulePage = lazy(() => import('../../pages/prototype/PrototypeModulePage').then(module => ({ default: module.PrototypeModulePage })))
 
@@ -31,10 +29,10 @@ export function AppRouter() {
       <Route path="/app/tl/rotacion" element={<RequireSession roles={['tl']}><TlDashboardPage /></RequireSession>} />
       <Route path="/app/tl/talent-passport" element={<Navigate to="/app/tl" replace />} />
       <Route path="/app/tl/:section" element={<RequireSession roles={['tl']}><PrototypeModulePage role="TL" /></RequireSession>} />
-      <Route path="/app/leader" element={<RequireSession roles={['coder']}><LeaderDashboardPage /></RequireSession>} />
-      <Route path="/app/leader/tablero" element={<RequireSession roles={['coder']}><LeaderDashboardPage /></RequireSession>} />
-      <Route path="/app/leader/:section" element={<RequireSession roles={['coder']}><PrototypeModulePage role="Líder" /></RequireSession>} />
-      <Route path="/app/coder" element={<RequireSession roles={['coder']}><WorkspacePage /></RequireSession>} />
+      <Route path="/app/leader" element={<Navigate to="/app/coder" replace />} />
+      <Route path="/app/leader/tablero" element={<Navigate to="/app/coder" replace />} />
+      <Route path="/app/leader/:section" element={<Navigate to="/app/coder" replace />} />
+      <Route path="/app/coder" element={<RequireSession roles={['coder']}><Navigate to="/app/coder/tablero" replace /></RequireSession>} />
       <Route path="/app/coder/:space" element={<RequireSession roles={['coder']}><CoderSpacePage /></RequireSession>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes></Suspense>
