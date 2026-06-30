@@ -9,6 +9,9 @@ CLAUDE.md
 **/obj/
 **/node_modules/
 frontend/dist/
+frontend/pnpm-lock.yaml
+.codex-run/
+**/.codex-run/
 *.user
 *.suo
 *.log
