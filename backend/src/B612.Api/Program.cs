@@ -17,8 +17,13 @@ builder.Services.AddSingleton<S3TalentPassportService>();
 builder.Services.AddHostedService<SprintAutoCloseService>();
 builder.Services.AddCors(options =>
 {
+    var allowedOrigins = builder.Configuration
+        .GetSection("AllowedOrigins")
+        .Get<string[]>()
+        ?? ["http://localhost:5173", "http://127.0.0.1:5173", "https://b612.bytecore.tech"];
+
     options.AddPolicy("Frontend", policy =>
-        policy.WithOrigins("http://localhost:5173", "http://127.0.0.1:5173")
+        policy.WithOrigins(allowedOrigins)
             .AllowAnyHeader()
             .AllowAnyMethod());
 });

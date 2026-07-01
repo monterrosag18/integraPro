@@ -141,7 +141,7 @@ export function TlDashboardPage() {
           setCellIds(idMap)
           if (cid) {
             setClanId(cid)
-            apiRequest<{ sprints: RealSprint[] }>(`/sprints?clanId=${cid}`).then(r => setRealSprints(r.sprints)).catch(() => undefined)
+            apiRequest<RealSprint[]>(`/sprints?clanId=${cid}`).then(setRealSprints).catch(() => undefined)
             apiRequest<{ issues: HealthIssue[]; repeatedCells: number; repeatedLeaders: number }>(`/rotation/health?clanId=${cid}`)
               .then(r => setHealthIssues(r.issues)).catch(() => undefined)
           }

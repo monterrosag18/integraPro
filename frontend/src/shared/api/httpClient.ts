@@ -1,14 +1,6 @@
 import { getSession } from '../auth/session'
 
-const rawApiUrl = String(import.meta.env.VITE_API_URL ?? '').trim()
-
-function normalizeApiUrl(value: string) {
-  const base = (value || '/api').replace(/\/+$/, '')
-  if (base === 'https://b612api.bytecore.tech/api') return 'https://b612api.bytecore.tech/api/v1'
-  return base
-}
-
-const API_URL = normalizeApiUrl(rawApiUrl)
+const API_URL = (String(import.meta.env.VITE_API_URL ?? '').trim() || '/api').replace(/\/+$/, '')
 
 function apiUrl(path: string) {
   const normalizedPath = path.startsWith('/') ? path : `/${path}`
