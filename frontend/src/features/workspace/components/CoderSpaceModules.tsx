@@ -9,15 +9,16 @@ import { fetchGithubMeta, timeAgo, type GithubGist, type GithubMeta, type Github
 type Story = { id: string; title: string; asA: string; soThat: string; assignee: string; assigneeName: string | null; points: number; priority: 'Alta' | 'Media' | 'Baja' }
 type BoardColumn = { id: string; title: string; color: string; stories: Story[] }
 type ProjectCard = { id?: string; name: string; owner: string; source: string; progress: number; status: string; repo: string; stories?: number; doneStories?: number; githubLinks?: number; ceremonies?: number }
-type ApiProjectMeta = { id: string; name: string; sprint: number; sprintStatus: string; cell: string; clan: string; stories: number; doneStories: number; progress: number; githubLinks: number; ceremonies: number }
-type ApiStory = { id: string; asA: string; iWant: string; soThat: string; status: string; assignee: string | null; estimate: number; priority: number | null }
-type ApiCeremony = { id: string; type: string; date: string; status: string }
+type ApiProjectMeta = { id: string; name: string; sprintId?: string; cellId?: string; clanId?: string; boardId?: string | null; backlogId?: string | null; sprint: number; sprintStatus: string; cell: string; clan: string; stories: number; doneStories: number; progress: number; githubLinks: number; ceremonies: number }
+type ApiStory = { id: string; asA: string; iWant: string; soThat: string; status?: string; kanbanStatus?: string; assignee?: string | null; assigneeCodeId?: string | null; estimate: number | null; priority: number | null }
+type ApiCeremony = { id: string; type?: string; ceremonyType?: string; date: string; status: string }
 type CoderProfile = {
   coder: { id: string; name: string; email: string; campus: string; cohort: string; clan: string }
   metrics: { roses: number; leaderRuns: number; assignedStories: number; doneStories: number; donePoints: number; averageEvaluation: number }
   history: Array<{ sprint: number; cell: string; role: string; startDate: string; endDate: string; status: string }>
 }
 type EvalCriterion = { criterionId: number; criterion: string; scope: string; average: number; responses: number }
+type ApiEvaluationCriterion = { id: number; name: string; scope: string; active: boolean }
 
 function priorityLabel(p: number | null): 'Alta' | 'Media' | 'Baja' {
   if (!p || p <= 1) return 'Baja'
@@ -37,8 +38,9 @@ function apiStoriesToBoard(stories: ApiStory[]): BoardColumn[] {
   ]
   const map: Record<string, number> = { todo: 0, in_progress: 1, review: 2, done: 3 }
   for (const s of stories) {
-    const idx = map[s.status.toLowerCase()] ?? 0
-    cols[idx].stories.push({ id: s.id, title: s.iWant, asA: s.asA ?? '', soThat: s.soThat ?? '', assignee: initials(s.assignee), assigneeName: s.assignee, points: s.estimate ?? 1, priority: priorityLabel(s.priority) })
+    const status = (s.kanbanStatus ?? s.status ?? 'todo').toLowerCase()
+    const idx = map[status] ?? 0
+    cols[idx].stories.push({ id: s.id, title: s.iWant, asA: s.asA ?? '', soThat: s.soThat ?? '', assignee: initials(s.assignee ?? s.assigneeCodeId ?? null), assigneeName: s.assignee ?? null, points: s.estimate ?? 1, priority: priorityLabel(s.priority) })
   }
   return cols
 }
@@ -156,6 +158,7 @@ function GithubMetaCard({ meta, url }: { meta: GithubMeta; url: string }) {
 
 // ---- ProjectsModule ----
 type GhLink = { id: string; url: string; addedBy: string | null; addedByUserId: string }
+type GhLinksResponse = GhLink[] | { links: GhLink[] }
 
 function ProjectsModule() {
   const user = getCurrentUser()
@@ -176,8 +179,9 @@ function ProjectsModule() {
   const fetching = useRef(false)
 
   const fetchLinks = (projectId: string) => {
-    apiRequest<{ links: GhLink[] }>(`/projects/${projectId}/github-links`)
-      .then(({ links }) => {
+    apiRequest<GhLinksResponse>(`/projects/${projectId}/github-links`)
+      .then(payload => {
+        const links = Array.isArray(payload) ? payload : payload.links
         setGhLinks(links)
         links.forEach(link => {
           fetchGithubMeta(link.url).then(meta => {
@@ -239,7 +243,7 @@ function ProjectsModule() {
     try {
       await apiRequest(`/projects/${activeProjectId}/github-links`, {
         method: 'POST',
-        body: JSON.stringify({ url: addUrl.trim(), addedByUserId: user.id }),
+        body: JSON.stringify({ projectId: activeProjectId, url: addUrl.trim() }),
       })
       setAddUrl('')
       fetchLinks(activeProjectId)
@@ -254,7 +258,7 @@ function ProjectsModule() {
   const handleDeleteLink = async (linkId: string) => {
     if (!activeProjectId) return
     setGhLinks(prev => prev.filter(l => l.id !== linkId))
-    await apiRequest(`/projects/${activeProjectId}/github-links/${linkId}`, { method: 'DELETE' }).catch(() => undefined)
+    await apiRequest(`/github-links/${linkId}`, { method: 'DELETE' }).catch(() => undefined)
     toast('Enlace eliminado')
   }
 
@@ -340,7 +344,7 @@ function BoardModule() {
   })
   const [dragged, setDragged] = useState<{ story: Story; from: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null)
+  const [activeBacklogId, setActiveBacklogId] = useState<string | null>(null)
   const [editing, setEditing] = useState<{ storyId: string; colId: string; title: string; asA: string; soThat: string } | null>(null)
   const [notice, setNotice] = useState('')
 
@@ -357,13 +361,14 @@ function BoardModule() {
       .then(({ projects }) => {
         const active = projects.find(p => p.sprintStatus === 'active') ?? projects[0]
         if (!active) return Promise.resolve(null)
-        setActiveProjectId(active.id)
-        return apiRequest<{ project: ApiProjectMeta; stories: ApiStory[] }>(`/projects/${active.id}`)
+        setActiveBacklogId(active.backlogId ?? null)
+        if (!active.boardId) return Promise.resolve(null)
+        return apiRequest<ApiStory[]>(`/boards/${active.boardId}/stories`)
       })
-      .then(details => {
-        if (!details) return
+      .then(stories => {
+        if (!stories) return
         // Merge DB stories into current columns so local-only stories aren't lost
-        const dbCols = apiStoriesToBoard(details.stories)
+        const dbCols = apiStoriesToBoard(stories)
         setColumns(current => dbCols.map(dbCol => {
           const localCol = current.find(c => c.id === dbCol.id)
           const localOnly = (localCol?.stories ?? []).filter(s => s.id.startsWith('local-'))
@@ -385,10 +390,10 @@ function BoardModule() {
     ))
     setDragged(null)
     // Sync to DB asynchronously
-    if (activeProjectId && !story.id.startsWith('local-')) {
-      apiRequest(`/projects/${activeProjectId}/stories/${story.id}/status`, {
+    if (!story.id.startsWith('local-')) {
+      apiRequest(`/stories/${story.id}/status`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: target }),
+        body: JSON.stringify({ kanbanStatus: target }),
       }).catch(() => toast('Estado guardado localmente · sin sincronización con el servidor'))
     }
   }
@@ -403,12 +408,12 @@ function BoardModule() {
     ))
     setEditing({ storyId: tempId, colId: 'todo', title: 'Nueva historia', asA: newStory.asA, soThat: '' })
 
-    if (!activeProjectId) return
+    if (!activeBacklogId) return
 
     try {
-      const res = await apiRequest<{ id: string; iWant: string; status: string }>(`/projects/${activeProjectId}/stories`, {
+      const res = await apiRequest<ApiStory>('/stories', {
         method: 'POST',
-        body: JSON.stringify({ iWant: 'Nueva historia', asA: user?.fullName ?? 'Coder', soThat: '', estimate: 3, priority: 2 }),
+        body: JSON.stringify({ backlogId: activeBacklogId, iWant: 'Nueva historia', asA: user?.fullName ?? 'Coder', soThat: 'deliver visible value', estimate: 3, priority: 2 }),
       })
       // Replace temp ID with real UUID from DB
       setColumns(current => current.map(col => ({
@@ -431,8 +436,8 @@ function BoardModule() {
     ))
     setEditing(null)
     // Sync to DB if IDs are available
-    if (activeProjectId && !storyId.startsWith('local-')) {
-      apiRequest(`/projects/${activeProjectId}/stories/${storyId}`, {
+    if (!storyId.startsWith('local-')) {
+      apiRequest(`/stories/${storyId}`, {
         method: 'PATCH',
         body: JSON.stringify({ iWant: title, asA, soThat }),
       }).catch(() => toast('Historia guardada localmente · sin sincronización con el servidor'))
@@ -538,6 +543,8 @@ function CeremoniesModule() {
     return MessageSquareText
   }
 
+  const displayCeremonyType = (item: ApiCeremony) => item.type ?? item.ceremonyType ?? 'Planning'
+
   const formatDate = (iso: string) => {
     try { return new Date(iso).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' }) }
     catch { return iso }
@@ -548,9 +555,10 @@ function CeremoniesModule() {
     if (!projectId || !newType || !newDate) return
     setAddingCeremony(true)
     try {
-      const res = await apiRequest<ApiCeremony>('/ceremonies', {
+      const endpointType = newType.toLowerCase() === 'retrospective' ? 'retrospective' : newType.toLowerCase()
+      const res = await apiRequest<ApiCeremony>(`/projects/${projectId}/ceremonies/${endpointType}`, {
         method: 'POST',
-        body: JSON.stringify({ projectId, type: newType, date: new Date(newDate).toISOString(), status: 'scheduled' }),
+        body: JSON.stringify({ date: new Date(newDate).toISOString() }),
       })
       setCeremonies(prev => [...prev, res])
       setShowAddForm(false)
@@ -565,7 +573,7 @@ function CeremoniesModule() {
 
   const handleUpdateStatus = async (id: string, status: string) => {
     try {
-      await apiRequest(`/ceremonies/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) })
+      await apiRequest(`/ceremonies/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status }) })
       setCeremonies(prev => prev.map(c => c.id === id ? { ...c, status } : c))
       setActive(null)
       toast('Estado actualizado')
@@ -587,7 +595,6 @@ function CeremoniesModule() {
     {showAddForm && <form onSubmit={handleCreate} className="gh-add-form gh-add-form--full" style={{ marginBottom: '1rem' }}>
       <select value={newType} onChange={e => setNewType(e.target.value)} disabled={addingCeremony}>
         <option value="Planning">Planning</option>
-        <option value="Daily">Daily</option>
         <option value="Review">Review</option>
         <option value="Retrospective">Retrospective</option>
       </select>
@@ -601,11 +608,12 @@ function CeremoniesModule() {
     {ceremonies.length === 0 && !loading && <p style={{ padding: '1.5rem', color: 'var(--fg-muted)' }}>No hay ceremonias registradas para este proyecto aún.</p>}
 
     {ceremonies.length > 0 && <div className="ceremony-grid">{ceremonies.map((item, index) => {
-      const Icon = ceremonyIcon(item.type)
+      const type = displayCeremonyType(item)
+      const Icon = ceremonyIcon(type)
       const isToday = item.status?.toLowerCase() === 'active' || item.status?.toLowerCase() === 'en_curso'
       return <article className={index === 1 || isToday ? 'active' : ''} key={item.id}>
         <span><Icon /></span>
-        <div><small>{formatDate(item.date)}</small><h3>{item.type}</h3><p>Ceremonia del proyecto</p><b>{item.status}</b></div>
+        <div><small>{formatDate(item.date)}</small><h3>{type}</h3><p>Ceremonia del proyecto</p><b>{item.status}</b></div>
         <button onClick={() => setActive(item)}>Ver detalle <ChevronRight /></button>
       </article>
     })}</div>}
@@ -613,7 +621,7 @@ function CeremoniesModule() {
     {active && <div className="modal-backdrop" onMouseDown={() => setActive(null)}>
       <section className="modal-card modal-card--side" onMouseDown={event => event.stopPropagation()}>
         <button type="button" className="prototype-modal-close" onClick={() => setActive(null)}><X /></button>
-        <p className="eyebrow">{formatDate(active.date)}</p><h2>{active.type}</h2>
+        <p className="eyebrow">{formatDate(active.date)}</p><h2>{displayCeremonyType(active)}</h2>
         <p>Estado: <strong>{active.status}</strong></p>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', marginTop: '1rem' }}>
           {active.status !== 'done' && <button className="primary-button" onClick={() => handleUpdateStatus(active.id, 'done')}>Marcar completada</button>}
@@ -630,7 +638,7 @@ function CeremoniesModule() {
 function StarRating({ value, onChange, disabled = false }: { value: number; onChange: (value: number) => void; disabled?: boolean }) { return <div className={`star-rating ${disabled ? 'star-rating--disabled' : ''}`}>{[1, 2, 3, 4, 5].map(star => <button disabled={disabled} aria-label={`${star} estrellas`} className={star <= value ? 'selected' : ''} onClick={() => onChange(star)} key={star}><Star /></button>)}</div> }
 
 type CellMember = { coderId: string; name: string; role: string }
-type RotationCells = { cells: { cellName: string; coders: CellMember[] }[] }
+type ClanCoder = { userId: string; fullName: string; email: string; clanId?: string }
 
 function EvaluationsModule() {
   const user = getCurrentUser()
@@ -648,19 +656,20 @@ function EvaluationsModule() {
 
   useEffect(() => {
     if (!user?.id) { setLoading(false); return }
-    const clanName = user.clan ?? ''
     Promise.all([
-      apiRequest<{ anonymous: boolean; criteria: EvalCriterion[] }>(`/evaluations/summary?coderId=${user.id}`),
+      apiRequest<ApiEvaluationCriterion[]>('/evaluation-criteria?scope=person'),
       apiRequest<{ projects: ApiProjectMeta[] }>(`/projects?coderId=${user.id}`),
-      clanName ? apiRequest<RotationCells>(`/rotation/cells?clanName=${encodeURIComponent(clanName)}`) : Promise.resolve<RotationCells | null>(null),
     ])
-      .then(([evalData, projData, rotData]) => {
-        setCriteria(evalData.criteria)
+      .then(([criteriaData, projData]) => {
+        setCriteria(criteriaData.filter(c => c.active).map(c => ({ criterionId: c.id, criterion: c.name, scope: c.scope, average: 0, responses: 0 })))
         const active = projData.projects.find(p => p.sprintStatus === 'active') ?? projData.projects[0]
-        if (active) setProjectId(active.id)
-        if (rotData) {
-          const myCell = rotData.cells.find(c => c.cellName === user.cell)
-          if (myCell) setCellMembers(myCell.coders.filter(m => m.coderId !== user.id))
+        if (active) {
+          setProjectId(active.id)
+          if (active.clanId) {
+            apiRequest<ClanCoder[]>(`/coders?clanId=${active.clanId}`)
+              .then(coders => setCellMembers(coders.filter(coder => coder.userId !== user.id).map(coder => ({ coderId: coder.userId, name: coder.fullName, role: 'rotator' }))))
+              .catch(() => undefined)
+          }
         }
       })
       .catch(() => undefined)
@@ -684,16 +693,9 @@ function EvaluationsModule() {
     if (scores.length === 0) { toast('Selecciona al menos una valoración'); return }
     setSubmitting(true)
     try {
-      await apiRequest('/evaluations', {
+      await apiRequest(selectedSubject ? `/projects/${projectId}/evaluations/peer/${selectedSubject}` : `/projects/${projectId}/evaluations/self`, {
         method: 'POST',
-        body: JSON.stringify({
-          ceremonyType: 'review',
-          evaluatorUserId: user.id,
-          projectId,
-          subjectCoderId: selectedSubject ?? null,
-          evalType: 'peer',
-          scores,
-        }),
+        body: JSON.stringify({ scores }),
       })
       if (selectedSubject) setSubmitted(prev => new Set([...prev, selectedSubject]))
       setRatings({})

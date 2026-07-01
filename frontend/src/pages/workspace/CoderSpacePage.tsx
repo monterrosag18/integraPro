@@ -8,14 +8,15 @@ import { getCurrentUser } from '../../shared/auth/session'
 import { RoleShell } from '../../shared/components/layout/RoleShell'
 
 type ProjectMeta = {
-  id: string; name: string; sprint: number; sprintStatus: string
+  id: string; name: string; sprint: number; sprintStatus: string; boardId?: string | null; clanId?: string
   cell: string; stories: number; doneStories: number; progress: number
   githubLinks: number; ceremonies: number
 }
-type ProjectDetails = { stories: Array<{ status: string }> }
+type ProjectDetails = { stories: Array<{ status?: string; kanbanStatus?: string }> }
 type CoderProfile = { metrics: { roses: number; leaderRuns: number; assignedStories: number; doneStories: number; averageEvaluation: number } }
 type EvalSummary = { criteria: Array<{ average: number }> }
 type CeremoniesData = { ceremonies: Array<{ status: string; date: string }> }
+type ApiEvaluationCriterion = { id: number; name: string; scope: string; active: boolean }
 
 type SpaceBase = { icon: ElementType; art: string; color: string }
 
@@ -67,9 +68,9 @@ export function CoderSpacePage() {
         const active = projects.find(p => p.sprintStatus === 'active') ?? projects[0]
         if (!active) return
         setProject(active)
-        if (slug === 'sprints' || slug === 'tablero') {
-          apiRequest<{ project: ProjectMeta; stories: Array<{ status: string }> }>(`/projects/${active.id}`)
-            .then(d => setProjectDetails(d))
+        if ((slug === 'sprints' || slug === 'tablero') && active.boardId) {
+          apiRequest<Array<{ status?: string; kanbanStatus?: string }>>(`/boards/${active.boardId}/stories`)
+            .then(stories => setProjectDetails({ stories }))
             .catch(() => undefined)
         }
         if (slug === 'ceremonias') {
@@ -77,9 +78,11 @@ export function CoderSpacePage() {
             .then(d => setCeremonies(d))
             .catch(() => undefined)
         }
-        apiRequest<{ sprints: Array<{ endDate: string }> }>(`/sprints`)
-          .then(d => { if (d.sprints[0]) setSprintEndDate(d.sprints[0].endDate) })
-          .catch(() => undefined)
+        if (active.clanId) {
+          apiRequest<Array<{ endDate: string }>>(`/sprints?clanId=${active.clanId}`)
+            .then(sprints => { if (sprints[0]) setSprintEndDate(sprints[0].endDate) })
+            .catch(() => undefined)
+        }
       })
       .catch(() => undefined)
 
@@ -87,8 +90,8 @@ export function CoderSpacePage() {
       apiRequest<CoderProfile>(`/coders/${user.id}/profile`)
         .then(d => setProfile(d))
         .catch(() => undefined)
-      apiRequest<EvalSummary>(`/evaluations/summary?coderId=${user.id}`)
-        .then(d => setEvalSummary(d))
+      apiRequest<ApiEvaluationCriterion[]>('/evaluation-criteria?scope=person')
+        .then(criteria => setEvalSummary({ criteria: criteria.filter(c => c.active).map(() => ({ average: 0 })) }))
         .catch(() => undefined)
     }
   }, [slug, user?.id])
@@ -99,9 +102,9 @@ export function CoderSpacePage() {
   const sprintLabel = project ? `Sprint ${project.sprint}` : 'Sprint activo'
   const firstName = user?.fullName.split(' ')[0] ?? 'Coder'
 
-  const todoCount = projectDetails?.stories.filter(s => s.status === 'todo').length
-  const inProgressCount = projectDetails?.stories.filter(s => s.status === 'in_progress').length
-  const doneCount = projectDetails?.stories.filter(s => s.status === 'done').length ?? project?.doneStories
+  const todoCount = projectDetails?.stories.filter(s => (s.kanbanStatus ?? s.status) === 'todo').length
+  const inProgressCount = projectDetails?.stories.filter(s => (s.kanbanStatus ?? s.status) === 'in_progress').length
+  const doneCount = projectDetails?.stories.filter(s => (s.kanbanStatus ?? s.status) === 'done').length ?? project?.doneStories
   const avgEval = evalSummary?.criteria.length
     ? (evalSummary.criteria.reduce((s, c) => s + Number(c.average), 0) / evalSummary.criteria.length).toFixed(1)
     : '—'

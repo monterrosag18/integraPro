@@ -8,8 +8,9 @@ import { RoleShell } from '../../shared/components/layout/RoleShell'
 type Summary = { campuses: number; cohorts: number; clans: number; cells: number; coders: number; tls: number; activeSprints: number; projects: number; stories: number }
 type CohortRow = { cohort: string; campus: string; clans: number; coders: number; status: string }
 type Overview = { cohorts: CohortRow[] }
-type ModuleConfig = { rows: string[][] }
-type CreateCohortResponse = { id: string; name: string; campus: string; clans: number; coders: number; status: string }
+type Campus = { id: string; name: string }
+type Cohort = { id: string; name: string; campusId: string; campusName?: string; campus?: string }
+type CreateCohortResponse = Cohort
 
 export function AdminDashboardPage() {
   const user = getCurrentUser()
@@ -22,21 +23,36 @@ export function AdminDashboardPage() {
   const [notice, setNotice] = useState('')
   const [summary, setSummary] = useState<Summary | null>(null)
   const [overview, setOverview] = useState<Overview>({ cohorts: [] })
-  const [campuses, setCampuses] = useState<string[]>([])
+  const [campuses, setCampuses] = useState<Campus[]>([])
 
   useEffect(() => {
-    void Promise.all([
-      apiRequest<Summary>('/dashboard/summary'),
-      apiRequest<Overview>('/dashboard/admin-overview'),
-      apiRequest<ModuleConfig>('/dashboard/module/admin/campus'),
-    ]).then(([summaryData, overviewData, campusData]) => {
-      setSummary(summaryData)
-      setOverview(overviewData)
-      const names = campusData.rows.map(row => row[0]).filter(Boolean)
-      if (names.length) {
-        setCampuses(names)
-        setFormCampus(names[0])
-      }
+    void apiRequest<Campus[]>('/Campus').then(async campusRows => {
+      setCampuses(campusRows)
+      if (campusRows[0]) setFormCampus(campusRows[0].id)
+      const cohortGroups = await Promise.all(
+        campusRows.map(campus => apiRequest<Cohort[]>(`/cohorts?campusId=${campus.id}`).catch(() => [] as Cohort[])),
+      )
+      const cohorts = cohortGroups.flat()
+      setOverview({
+        cohorts: cohorts.map(cohort => ({
+          cohort: cohort.name,
+          campus: cohort.campusName ?? campusRows.find(campus => campus.id === cohort.campusId)?.name ?? 'Campus',
+          clans: 0,
+          coders: 0,
+          status: 'Activa',
+        })),
+      })
+      setSummary({
+        campuses: campusRows.length,
+        cohorts: cohorts.length,
+        clans: 0,
+        cells: 0,
+        coders: 0,
+        tls: 0,
+        activeSprints: 0,
+        projects: 0,
+        stories: 0,
+      })
     }).catch(() => undefined)
   }, [])
 
@@ -53,10 +69,10 @@ export function AdminDashboardPage() {
     try {
       const result = await apiRequest<CreateCohortResponse>('/cohorts', {
         method: 'POST',
-        body: JSON.stringify({ name: formName.trim(), campusName: formCampus }),
+        body: JSON.stringify({ name: formName.trim(), campusId: formCampus }),
       })
       setOverview(prev => ({
-        cohorts: [{ cohort: result.name, campus: result.campus, clans: 0, coders: 0, status: 'Preparación' }, ...prev.cohorts]
+        cohorts: [{ cohort: result.name, campus: result.campusName ?? result.campus ?? 'Campus', clans: 0, coders: 0, status: 'Preparación' }, ...prev.cohorts]
       }))
       setSummary(prev => prev ? { ...prev, cohorts: prev.cohorts + 1 } : prev)
       setShowCreate(false)
@@ -126,7 +142,7 @@ export function AdminDashboardPage() {
           <label>Campus
             <select value={formCampus} onChange={e => setFormCampus(e.target.value)}>
               {campuses.length > 0
-                ? campuses.map(c => <option key={c}>{c}</option>)
+                ? campuses.map(campus => <option key={campus.id} value={campus.id}>{campus.name}</option>)
                 : <option>Cargando campus…</option>}
             </select>
           </label>
@@ -142,3 +158,4 @@ export function AdminDashboardPage() {
     </RoleShell>
   )
 }
+
